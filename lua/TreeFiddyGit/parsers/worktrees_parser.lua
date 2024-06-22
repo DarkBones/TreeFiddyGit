@@ -1,6 +1,6 @@
 local M = {}
 
-local function get_git_root()
+local function get_git_root_path()
     local handle = io.popen("git rev-parse --show-toplevel 2>/dev/null")
     if handle == nil then
         error("Failed to run git rev-parse --show-toplevel")
@@ -25,13 +25,13 @@ local function get_git_root()
             error("Not in a git repository")
         end
     else
-        -- Remove /main from the end of the path
-        return result:gsub("/main$", "")
+        -- remove the current branch from the path
+        return result:match("^(.+)/[^/]+$")
     end
 end
 
 local parse_worktree_line = function(worktree)
-    local git_root = get_git_root()
+    local git_root = get_git_root_path()
     if not git_root then
         error("Not a git repository or no access to the repository")
     end
