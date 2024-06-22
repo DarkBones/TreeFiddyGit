@@ -1,5 +1,6 @@
 local Job = require("plenary.job")
 local telescope = require("telescope")
+local worktree_parser = require("TreeFiddyGit.parsers.worktrees_parser")
 
 -- TODO: Detect if we are in a worktree (bare) repo
 local function is_bare_repo(callback)
@@ -44,7 +45,7 @@ M.get_git_worktrees = function(callback)
             on_exit = function(j, return_val)
                 if return_val == 0 then
                     local output = j:result()
-                    local parsed_output = require("TreeFiddyGit.parsers.worktrees_parser").parse_worktrees(output)
+                    local parsed_output = worktree_parser.parse_worktrees(output)
                     callback(parsed_output)
                 else
                     print("Error running git worktree list")
