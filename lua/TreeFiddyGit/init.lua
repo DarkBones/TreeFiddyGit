@@ -1,6 +1,7 @@
 local Job = require("plenary.job")
 local telescope = require("telescope")
 local worktree_parser = require("TreeFiddyGit.parsers.worktrees_parser")
+local utils = require("TreeFiddyGit.utils")
 
 local M = {}
 
@@ -33,6 +34,12 @@ end
 M.on_worktree_selected = function(name, path)
     print("Name: " .. name)
     print("Path: " .. path)
+
+    local git_root = utils.get_git_root_path()
+    local full_path = git_root .. "/" .. path:sub(3)
+
+    print("Full path: " .. full_path)
+
     -- vim.cmd("cd ." .. path)
 end
 
