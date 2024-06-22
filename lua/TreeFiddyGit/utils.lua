@@ -1,4 +1,10 @@
+local path_utils = require("plenary.path")
+
 local M = {}
+
+M.make_relative = function(path, base)
+    return path_utils.new(path):make_relative(base)
+end
 
 M.get_git_root_path = function()
     local handle = io.popen("git rev-parse --show-toplevel 2>/dev/null")

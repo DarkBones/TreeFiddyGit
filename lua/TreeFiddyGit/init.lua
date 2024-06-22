@@ -36,7 +36,8 @@ M.on_worktree_selected = function(name, path)
     print("Path: " .. path)
 
     local git_root = utils.get_git_root_path()
-    local full_path = git_root .. "/" .. path:sub(3)
+    -- local full_path = git_root .. "/" .. path:sub(3)
+    local full_path = git_root .. "/" .. utils.make_relative(path, ".")
 
     print("Full path: " .. full_path)
 

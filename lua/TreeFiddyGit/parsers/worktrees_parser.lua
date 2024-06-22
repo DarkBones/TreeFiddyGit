@@ -14,15 +14,9 @@ local parse_worktree_line = function(worktree, max_name_length, max_path_length)
     end
 
     if parts[2] and parts[3] then
-        for part in string.gmatch(worktree, "%S+") do
-            table.insert(parts, part)
-        end
-
         -- Extract the worktree name, path, and commit hash
         local name = string.match(parts[3], "%[(.-)%]")
-        local escaped_root = git_root:gsub("([^%w])", "%%%1")
-        local path = string.gsub(parts[1], escaped_root, ".")
-
+        local path = "./" .. utils.make_relative(parts[1], git_root)
         local hash = parts[2]
 
         -- Adjust the max_path_length to account for the shortened path
