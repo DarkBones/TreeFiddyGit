@@ -32,16 +32,11 @@ M.get_git_worktrees = function(callback)
 end
 
 M.on_worktree_selected = function(name, path)
-    print("Name: " .. name)
-    print("Path: " .. path)
-
     local git_root = utils.get_git_root_path()
-    -- local full_path = git_root .. "/" .. path:sub(3)
     local full_path = git_root .. "/" .. utils.make_relative(path, ".")
 
-    print("Full path: " .. full_path)
-
-    -- vim.cmd("cd ." .. path)
+    -- TODO: Make `cd` configurable in case user has different method of changing directories
+    vim.cmd("cd " .. full_path)
 end
 
 return M
