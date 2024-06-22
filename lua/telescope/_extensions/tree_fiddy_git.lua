@@ -5,6 +5,8 @@ local sorters = require("telescope.sorters")
 local actions = require("telescope.actions")
 local action_state = require("telescope.actions.state")
 
+local git_worktrees = require("TreeFiddyGit").get_git_worktrees
+
 local tree_fiddy_git = function(opts)
     opts = opts or {}
 
@@ -12,14 +14,15 @@ local tree_fiddy_git = function(opts)
         .new(opts, {
             prompt_title = "Select Git Worktree",
             finder = finders.new_table({
-                results = { "item1", "item2", "item3" },
+                results = git_worktrees(),
             }),
             sorter = sorters.get_generic_fuzzy_sorter(),
             attach_mappings = function(prompt_bufnr, map)
                 actions.select_default:replace(function()
-                    local selection = action_state.get_selected_entry()
-                    print(vim.inspect(selection))
                     actions.close(prompt_bufnr)
+                    local selection = action_state.get_selected_entry()
+                    local message = vim.inspect(selection)
+                    vim.api.nvim_echo({ { message } }, false, {})
                 end)
                 return true
             end,
