@@ -31,7 +31,9 @@ M.get_git_worktrees = function(callback)
 end
 
 M.on_worktree_selected = function(name, path)
-    print("Selected worktree: " .. name .. " at " .. path)
+    print("Name: " .. name)
+    print("Path: " .. path)
+    -- vim.cmd("cd ." .. path)
 end
 
 return M
