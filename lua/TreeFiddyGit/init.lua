@@ -2,7 +2,6 @@ local Job = require("plenary.job")
 local telescope = require("telescope")
 local worktree_parser = require("TreeFiddyGit.parsers.worktrees_parser")
 
--- TODO: Detect if we are in a worktree (bare) repo
 local function is_bare_repo(callback)
     Job:new({
         command = "git",
