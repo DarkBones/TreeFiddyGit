@@ -43,7 +43,6 @@ local parse_worktree_line = function(worktree, max_name_length, max_path_length)
     end
 
     if parts[2] and parts[3] then
-        print(parts)
         for part in string.gmatch(worktree, "%S+") do
             table.insert(parts, part)
         end

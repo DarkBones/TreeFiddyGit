@@ -5,12 +5,12 @@ local sorters = require("telescope.sorters")
 local actions = require("telescope.actions")
 local action_state = require("telescope.actions.state")
 
-local git_worktrees = require("TreeFiddyGit").get_git_worktrees
+local tf = require("TreeFiddyGit")
 
 local tree_fiddy_git = function(opts)
     opts = opts or {}
 
-    git_worktrees(function(worktrees)
+    tf.get_git_worktrees(function(worktrees)
         vim.schedule(function()
             pickers
                 .new(opts, {
@@ -23,8 +23,9 @@ local tree_fiddy_git = function(opts)
                         actions.select_default:replace(function()
                             actions.close(prompt_bufnr)
                             local selection = action_state.get_selected_entry()
-                            local message = vim.inspect(selection)
-                            vim.api.nvim_echo({ { message } }, false, {})
+                            local message = selection[1]
+                            local wt_name, wt_path = message:match("([^%s]+)%s+([^%s]+)")
+                            tf.on_worktree_selected(wt_name, wt_path)
                         end)
                         return true
                     end,

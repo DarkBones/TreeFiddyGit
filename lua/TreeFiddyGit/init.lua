@@ -4,6 +4,8 @@ local worktree_parser = require("TreeFiddyGit.parsers.worktrees_parser")
 
 local M = {}
 
+-- TODO: Make a check if the current git repo is supported (bare repo, etc)
+
 M.hello = function()
     print("Hello from TreeFiddyGit!")
 end
@@ -26,6 +28,10 @@ M.get_git_worktrees = function(callback)
             end
         end,
     }):start()
+end
+
+M.on_worktree_selected = function(name, path)
+    print("Selected worktree: " .. name .. " at " .. path)
 end
 
 return M
