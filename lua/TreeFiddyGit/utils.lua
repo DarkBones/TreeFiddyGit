@@ -80,18 +80,6 @@ M.get_git_root_path = function()
 end
 
 M.update_worktree_buffer_path = function(old_git_path, new_git_path, buf_path)
-    -- old_git_path:    /Users/basdonker/Developer/git-playground-delete-me.git/main/nestedtree
-    -- new_git_path:    /Users/basdonker/Developer/git-playground-delete-me.git/feature-a
-    -- buf_path:        /Users/basdonker/Developer/git-playground-delete-me.git/main/nestedtree/app/controllers/home_controller.rb
-
-    -- output:          /Users/basdonker/Developer/git-playground-delete-me.git/feature-a/app/controllers/home_controller.rb
-    --
-    -- Plan:
-    -- 1. Remove old_path from buf_path to make buf_relative_path
-    -- 2. Concat new_path with buf_relative_path to make new_buf_path
-    -- local git_root = M.get_git_root_path()
-    -- print("git_root: " .. git_root)
-
     if buf_path:sub(1, #old_git_path) ~= old_git_path then
         return nil
     end
