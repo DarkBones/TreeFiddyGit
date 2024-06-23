@@ -5,6 +5,10 @@ local utils = require("TreeFiddyGit.utils")
 
 local M = {}
 
+M.config = {
+    change_directory_cmd = "cd",
+}
+
 -- TODO: Make a check if the current git repo is supported (bare repo, etc)
 
 M.hello = function()
@@ -35,8 +39,7 @@ M.on_worktree_selected = function(name, path)
     local git_root = utils.get_git_root_path()
     local full_path = git_root .. "/" .. utils.make_relative(path, ".")
 
-    -- TODO: Make `cd` configurable in case user has different method of changing directories
-    vim.cmd("cd " .. full_path)
+    vim.cmd(M.config.change_directory_cmd .. " " .. full_path)
 end
 
 return M
