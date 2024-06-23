@@ -98,5 +98,14 @@ describe("utils", function()
             local root_path = utils.get_git_root_path()
             assert.are.equal("./relative/path/.git", root_path)
         end)
+
+        it("should handle when worktree is named 'sometree.git'", function()
+            utils._git_root_path = function()
+                return "/home/user/gitrepo.git/worktrees/sometree.git"
+            end
+
+            local root_path = utils.get_git_root_path()
+            assert.are.equal("/home/user/gitrepo.git", root_path)
+        end)
     end)
 end)
