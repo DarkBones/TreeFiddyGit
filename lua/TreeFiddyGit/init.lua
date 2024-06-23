@@ -47,7 +47,13 @@ M.get_git_worktrees = function(callback)
     }):start()
 end
 
-M.on_worktree_selected = function(name, path)
+--- This function is called when a worktree is selected in the Telescope picker.
+-- It changes the root directory in Neovim to the selected worktree and updates
+-- the paths of all open buffers.
+-- If a buffer's file does not exist in the new worktree, assume the user just
+-- has a random file open and do nothing.
+-- @param path The path of the selected worktree.
+M.on_worktree_selected = function(path)
     local git_root = utils.get_git_root_path()
     local new_git_path = git_root .. "/" .. utils.make_relative(path, ".")
     local old_git_path = utils.get_git_path()
@@ -57,38 +63,16 @@ M.on_worktree_selected = function(name, path)
 
     -- Change the paths of all open buffers
     for _, bufnr in ipairs(vim.api.nvim_list_bufs()) do
-        local buf_path = vim.api.nvim_buf_get_name(bufnr)
-        local new_buf_path = utils.update_worktree_buffer_path(old_git_path, new_git_path, buf_path)
+        if vim.api.nvim_buf_is_valid(bufnr) then
+            local buf_path = vim.api.nvim_buf_get_name(bufnr)
+            local new_buf_path = utils.update_worktree_buffer_path(old_git_path, new_git_path, buf_path)
 
-        if new_buf_path then
-            vim.api.nvim_buf_set_name(bufnr, new_buf_path)
-            vim.api.nvim_command("edit!")
-        else
-            print("File does not exist in new worktree")
+            if new_buf_path then
+                vim.api.nvim_buf_set_name(bufnr, new_buf_path)
+                vim.api.nvim_command("edit!")
+            end
         end
     end
-
-    -- local git_root = utils.get_git_root_path()
-    -- local full_path = git_root .. "/" .. utils.make_relative(path, ".")
-    --
-    -- -- Change the directory of all open buffers
-    -- local old_git_root = vim.fn.getcwd()
-    --
-    -- vim.cmd(M.config.change_directory_cmd .. " " .. full_path)
-    --
-    -- for _, bufnr in ipairs(vim.api.nvim_list_bufs()) do
-    --     local buf_path = vim.api.nvim_buf_get_name(bufnr)
-    --     -- buf_path: /Users/basdonker/Developer/git-playground-delete-me.git/main/app/controllers/home_controller.rb
-    --     local new_buf_path = buf_path:gsub(old_git_root, full_path)
-    --
-    --     -- check if the new path exists
-    --     if vim.fn.filereadable(new_buf_path) == 1 then
-    --         vim.api.nvim_buf_set_name(bufnr, new_buf_path)
-    --         vim.api.nvim_command("edit!")
-    --     else
-    --         print("File does not exist: " .. new_buf_path)
-    --     end
-    -- end
 end
 
 return M

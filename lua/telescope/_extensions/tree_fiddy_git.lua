@@ -24,8 +24,8 @@ local tree_fiddy_git = function(opts)
                             actions.close(prompt_bufnr)
                             local selection = action_state.get_selected_entry()
                             local message = selection[1]
-                            local wt_name, wt_path = message:match("([^%s]+)%s+([^%s]+)")
-                            tf.on_worktree_selected(wt_name, wt_path)
+                            local _, wt_path = message:match("([^%s]+)%s+([^%s]+)")
+                            tf.on_worktree_selected(wt_path)
                         end)
                         return true
                     end,
