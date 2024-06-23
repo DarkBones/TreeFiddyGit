@@ -110,11 +110,57 @@ describe("utils", function()
 
     describe("update_file_path_to_new_worktree()", function()
         it("should return the new filepath", function()
-            -- git_root:    /Users/basdonker/Developer/git-playground-delete-me.git
-            -- full_path:   /Users/basdonker/Developer/git-playground-delete-me.git/feature-a
-            -- old_path:    /Users/basdonker/Developer/git-playground-delete-me.git/main/nestedtree
+            local old_git_path = "/home/user/gitrepo.git/main/nested/tree"
+            local new_git_path = "/home/user/gitrepo.git/feature-a"
+            local buf_path = "/home/user/gitrepo.git/main/nested/tree/app/some/nested/file.txt"
 
-            -- buf_path:    /Users/basdonker/Developer/git-playground-delete-me.git/main/nestedtree/app/controllers/home_controller.rb
+            local new_path = utils.update_worktree_buffer_path(old_git_path, new_git_path, buf_path)
+            assert.are.equal("/home/user/gitrepo.git/feature-a/app/some/nested/file.txt", new_path)
+        end)
+
+        it("should return nil when the buffer path is outside the git repo", function()
+            local old_git_path = "/home/user/gitrepo.git/main/nested/tree"
+            local new_git_path = "/home/user/gitrepo.git/feature-a"
+            local buf_path = "/home/user/otherrepo.git/main/nested/tree/app/some/nested/file.txt"
+
+            local new_path = utils.update_worktree_buffer_path(old_git_path, new_git_path, buf_path)
+            assert.is_nil(new_path)
+        end)
+
+        it("should handle when the new path and old path are the same", function()
+            local old_git_path = "/home/user/gitrepo.git/main/nested/tree"
+            local new_git_path = "/home/user/gitrepo.git/main/nested/tree"
+            local buf_path = "/home/user/gitrepo.git/main/nested/tree/app/some/nested/file.txt"
+
+            local new_path = utils.update_worktree_buffer_path(old_git_path, new_git_path, buf_path)
+            assert.are.equal("/home/user/gitrepo.git/main/nested/tree/app/some/nested/file.txt", new_path)
+        end)
+
+        it("should handle when the old path is a substring of the new path", function()
+            local old_git_path = "/home/user/gitrepo.git/main/nested/tree"
+            local new_git_path = "/home/user/gitrepo.git/main/nested/tree/feature-a"
+            local buf_path = "/home/user/gitrepo.git/main/nested/tree/app/some/nested/file.txt"
+
+            local new_path = utils.update_worktree_buffer_path(old_git_path, new_git_path, buf_path)
+            assert.are.equal("/home/user/gitrepo.git/main/nested/tree/feature-a/app/some/nested/file.txt", new_path)
+        end)
+
+        it("should handle when the old path is a superstring of the new path", function()
+            local old_git_path = "/home/user/gitrepo.git/main/nested/tree"
+            local new_git_path = "/home/user/gitrepo.git/main"
+            local buf_path = "/home/user/gitrepo.git/main/nested/tree/app/some/nested/file.txt"
+
+            local new_path = utils.update_worktree_buffer_path(old_git_path, new_git_path, buf_path)
+            assert.are.equal("/home/user/gitrepo.git/main/app/some/nested/file.txt", new_path)
+        end)
+
+        it("handles edge case where old, new, and buf path are all identical", function()
+            local old_git_path = "/home/user/gitrepo.git/main/nested/tree"
+            local new_git_path = "/home/user/gitrepo.git/main/nested/tree"
+            local buf_path = "/home/user/gitrepo.git/main/nested/tree"
+
+            local new_path = utils.update_worktree_buffer_path(old_git_path, new_git_path, buf_path)
+            assert.are.equal("/home/user/gitrepo.git/main/nested/tree", new_path)
         end)
     end)
 end)
