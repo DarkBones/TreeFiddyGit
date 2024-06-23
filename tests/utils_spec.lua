@@ -1,6 +1,5 @@
 ---@diagnostic disable: duplicate-set-field
 
-local async = require("plenary.async.tests")
 local assert = require("luassert")
 
 describe("utils", function()
