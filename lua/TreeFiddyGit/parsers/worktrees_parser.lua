@@ -1,11 +1,8 @@
 local utils = require("TreeFiddyGit.utils")
 local M = {}
 
-local parse_worktree_line = function(worktree, max_name_length, max_path_length)
+M._parse_worktree_line = function(worktree, max_name_length, max_path_length)
     local git_root = utils.get_git_root_path()
-    if not git_root then
-        error("Not a git repository or no access to the repository")
-    end
 
     -- Split the worktree string into parts
     local parts = {}
@@ -13,7 +10,8 @@ local parse_worktree_line = function(worktree, max_name_length, max_path_length)
         table.insert(parts, part)
     end
 
-    if parts[2] and parts[3] then
+    -- Only parse lines with all 3 parts, to avoid including the bare repo
+    if parts[3] then
         -- Extract the worktree name, path, and commit hash
         local name = string.match(parts[3], "%[(.-)%]")
         local path = "./" .. utils.make_relative(parts[1], git_root)
@@ -50,7 +48,7 @@ M.parse_worktrees = function(worktrees)
 
     -- Parse each worktree line with the calculated maximum lengths
     for _, worktree in ipairs(worktrees) do
-        local parsed_worktree = parse_worktree_line(worktree, max_name_length, max_path_length)
+        local parsed_worktree = M._parse_worktree_line(worktree, max_name_length, max_path_length)
         table.insert(parsed_worktrees, parsed_worktree)
     end
     return parsed_worktrees
