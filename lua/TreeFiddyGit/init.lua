@@ -48,18 +48,25 @@ M.get_git_worktrees = function(callback)
 end
 
 M.on_worktree_selected = function(name, path)
-    -- path:        ./feature-a
-    -- git_root:    /Users/basdonker/Developer/git-playground-delete-me.git
-    -- full_path:   /Users/basdonker/Developer/git-playground-delete-me.git/feature-a
-    -- old_path:    /Users/basdonker/Developer/git-playground-delete-me.git/main/nestedtree
-
     local git_root = utils.get_git_root_path()
-    local full_path = git_root .. "/" .. utils.make_relative(path, ".")
-    local old_path = utils.get_git_path()
+    local new_git_path = git_root .. "/" .. utils.make_relative(path, ".")
+    local old_git_path = utils.get_git_path()
 
-    print("git_root: " .. git_root)
-    print("full_path: " .. full_path)
-    print("old_path: " .. old_path)
+    -- Change the root in vim
+    vim.cmd(M.config.change_directory_cmd .. " " .. new_git_path)
+
+    -- Change the paths of all open buffers
+    for _, bufnr in ipairs(vim.api.nvim_list_bufs()) do
+        local buf_path = vim.api.nvim_buf_get_name(bufnr)
+        local new_buf_path = utils.update_worktree_buffer_path(old_git_path, new_git_path, buf_path)
+
+        if new_buf_path then
+            vim.api.nvim_buf_set_name(bufnr, new_buf_path)
+            vim.api.nvim_command("edit!")
+        else
+            print("File does not exist in new worktree")
+        end
+    end
 
     -- local git_root = utils.get_git_root_path()
     -- local full_path = git_root .. "/" .. utils.make_relative(path, ".")
