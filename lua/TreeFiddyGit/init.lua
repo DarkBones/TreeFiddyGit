@@ -1,5 +1,4 @@
 local Job = require("plenary.job")
-local telescope = require("telescope")
 local worktree_parser = require("TreeFiddyGit.parsers.worktrees_parser")
 local utils = require("TreeFiddyGit.utils")
 
