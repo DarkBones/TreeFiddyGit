@@ -1,9 +1,7 @@
 local utils = require("TreeFiddyGit.utils")
 local M = {}
 
-M._parse_worktree_line = function(worktree, max_name_length, max_path_length)
-    local git_root = utils.get_git_root_path()
-
+M._parse_worktree_line = function(worktree, max_name_length, max_path_length, git_root)
     -- Split the worktree string into parts
     local parts = {}
     for part in string.gmatch(worktree, "%S+") do
@@ -29,6 +27,7 @@ M.parse_worktrees = function(worktrees)
     local parsed_worktrees = {}
     local max_name_length = 0
     local max_path_length = 0
+    local git_root = utils.get_git_root_path()
 
     -- Calculate the maximum length of each column
     for _, worktree in ipairs(worktrees) do
@@ -48,7 +47,7 @@ M.parse_worktrees = function(worktrees)
 
     -- Parse each worktree line with the calculated maximum lengths
     for _, worktree in ipairs(worktrees) do
-        local parsed_worktree = M._parse_worktree_line(worktree, max_name_length, max_path_length)
+        local parsed_worktree = M._parse_worktree_line(worktree, max_name_length, max_path_length, git_root)
         table.insert(parsed_worktrees, parsed_worktree)
     end
     return parsed_worktrees
