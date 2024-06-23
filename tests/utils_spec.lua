@@ -80,5 +80,23 @@ describe("utils", function()
                 utils.get_git_root_path()
             end)
         end)
+
+        it("should handle when git root path is a subdirectory of the current directory", function()
+            utils._git_root_path = function()
+                return "./subdirectory/.git"
+            end
+
+            local root_path = utils.get_git_root_path()
+            assert.are.equal("./subdirectory/.git", root_path)
+        end)
+
+        it("should handle when git root path is a relative path", function()
+            utils._git_root_path = function()
+                return "./relative/path/.git"
+            end
+
+            local root_path = utils.get_git_root_path()
+            assert.are.equal("./relative/path/.git", root_path)
+        end)
     end)
 end)
