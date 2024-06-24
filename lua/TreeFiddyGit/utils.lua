@@ -12,7 +12,7 @@ end
 -- where `worktree_name` is the name of the current worktree.
 -- The format is always gitrepo.git/worktrees/worktree_name, even if the worktree
 -- is deeply nested in other worktrees.
--- @return string: A reference to the current git worktree.
+-- @param callback function: The callback function to be called with the result.
 M._get_git_worktree_reference = function(callback)
     Job:new({
         command = "git",
@@ -29,7 +29,7 @@ M._get_git_worktree_reference = function(callback)
 end
 
 --- This function returns the current working directory.
--- @return string: The current working directory.
+-- @param callback function: The callback function to be called with the result.
 M._get_pwd = function(callback)
     Job:new({
         command = "pwd",
@@ -47,7 +47,7 @@ end
 --- This function returns the actual path of the current git worktree.
 -- The returned path is the root path of the current worktree, regardless of
 -- how deeply nested the current directory is within the worktree.
--- @return string: The path of the current git worktree.
+-- @param callback function: The callback function to be called with the result.
 M.get_git_path = function(callback)
     -- TODO: Plenary job
     Job:new({
@@ -69,7 +69,7 @@ end
 -- If a tree is nested in another tree, it won't affect the result.
 -- If a user is in some deeply nested directory, it will still only return the root path
 -- If the current directory is not a supported (bare) git repository, it throws an error.
--- @return string: The root path of the current git repository.
+-- @param callback function: The callback function to be called with the result.
 M.get_git_root_path = function(callback)
     M._get_git_worktree_reference(function(root_path)
         if root_path == nil then
