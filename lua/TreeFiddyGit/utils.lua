@@ -1,3 +1,4 @@
+local Job = require("plenary.job")
 local path_utils = require("plenary.path")
 
 local M = {}
@@ -12,40 +13,55 @@ end
 -- The format is always gitrepo.git/worktrees/worktree_name, even if the worktree
 -- is deeply nested in other worktrees.
 -- @return string: A reference to the current git worktree.
-M._get_git_worktree_reference = function()
-    local handle = io.popen("git rev-parse --git-dir 2>/dev/null")
-    if handle == nil then
-        error("Failed to run `git rev-parse --git-dir`")
-    end
-    local result = handle:read("*a")
-    handle:close()
-    return result:match("^%s*(.-)%s*$") -- trim whitespace
+M._get_git_worktree_reference = function(callback)
+    Job:new({
+        command = "git",
+        args = { "rev-parse", "--git-dir" },
+        on_exit = function(j, return_val)
+            if return_val == 0 then
+                local result = j:result()[1]
+                callback(result:match("^%s*(.-)%s*$"))
+            else
+                error("Failed to run `git rev-parse --git-dir`")
+            end
+        end,
+    }):start()
 end
 
 --- This function returns the current working directory.
 -- @return string: The current working directory.
-M._get_pwd = function()
-    local handle = io.popen("pwd")
-    if handle == nil then
-        error("Failed to run pwd")
-    end
-    local result = handle:read("*a")
-    handle:close()
-    return result:match("^%s*(.-)%s*$") -- trim whitespace
+M._get_pwd = function(callback)
+    Job:new({
+        command = "pwd",
+        on_exit = function(j, return_val)
+            if return_val == 0 then
+                local result = j:result()[1]
+                callback(result:match("^%s*(.-)%s*$"))
+            else
+                error("Failed to run pwd")
+            end
+        end,
+    }):start()
 end
 
 --- This function returns the actual path of the current git worktree.
 -- The returned path is the root path of the current worktree, regardless of
 -- how deeply nested the current directory is within the worktree.
 -- @return string: The path of the current git worktree.
-M.get_git_path = function()
-    local handle = io.popen("git rev-parse --show-toplevel 2>/dev/null")
-    if handle == nil then
-        error("Failed to run `git rev-parse --show-toplevel`")
-    end
-    local result = handle:read("*a")
-    handle:close()
-    return result:match("^%s*(.-)%s*$") -- trim whitespace
+M.get_git_path = function(callback)
+    -- TODO: Plenary job
+    Job:new({
+        command = "git",
+        args = { "rev-parse", "--show-toplevel" },
+        on_exit = function(j, return_val)
+            if return_val == 0 then
+                local result = j:result()[1]
+                callback(result:match("^%s*(.-)%s*$"))
+            else
+                error("Failed to run `git rev-parse --show-toplevel`")
+            end
+        end
+    }):start()
 end
 
 --- This function returns the root path of the current git repository.
@@ -54,29 +70,31 @@ end
 -- If a user is in some deeply nested directory, it will still only return the root path
 -- If the current directory is not a supported (bare) git repository, it throws an error.
 -- @return string: The root path of the current git repository.
-M.get_git_root_path = function()
-    local root_path = M._get_git_worktree_reference()
-
-    if root_path == nil then
-        error("Not in a git repository")
-    end
-
-    if root_path == "." then
-        local pwd = M._get_pwd()
-
-        if pwd:sub(-4) == ".git" then
-            return pwd
-        else
+M.get_git_root_path = function(callback)
+    M._get_git_worktree_reference(function(root_path)
+        if root_path == nil then
             error("Not in a git repository")
         end
-    elseif root_path:find(".git/worktrees/") then
-        -- remove the current branch from the path
-        root_path = root_path:match("^(.+.git)/worktrees.*")
-    elseif root_path == ".git" then
-        error("Not in a supported git repository. Must be bare")
-    end
 
-    return root_path
+        if root_path == "." then
+            -- local pwd = M._get_pwd()
+            M._get_pwd(function(pwd)
+                if pwd:sub(-4) == ".git" then
+                    callback(pwd)
+                else
+                    error("Not in a git repository")
+                end
+            end)
+        elseif root_path == ".git" then
+            error("Not in a supported git repository. Must be bare")
+        elseif root_path:find(".git/worktrees/") then
+            -- remove the current branch from the path
+            root_path = root_path:match("^(.+.git)/worktrees.*")
+            callback(root_path)
+        else
+            error("Failed to get git root path")
+        end
+    end)
 end
 
 M.update_worktree_buffer_path = function(old_git_path, new_git_path, buf_path)
