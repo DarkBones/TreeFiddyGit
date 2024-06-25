@@ -55,7 +55,7 @@ local create_worktree = function(opts)
                                 return
                             end
 
-                            local path = vim.fn.input("Enter path to worktree (defaults to " .. branch_name .. "): ")
+                            local path = vim.fn.input("Enter path to worktree (defaults to branch name): ")
 
                             if path == "" then
                                 path = branch_name
