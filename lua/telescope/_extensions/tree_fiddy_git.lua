@@ -51,7 +51,6 @@ local create_worktree = function(opts)
                         actions.select_default:replace(function()
                             actions.close(prompt_bufnr)
                             local branch_name = action_state.get_current_line()
-                            -- local path = vim.fn.input("Enter path to worktree (empty for same as branch name): ")
                             if branch_name == "" then
                                 return
                             end
