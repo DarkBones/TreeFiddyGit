@@ -47,6 +47,11 @@ M.get_git_worktrees = function(callback)
     }):start()
 end
 
+M.create_git_worktree = function(branch_name, path)
+    print("branch_name: " .. branch_name)
+    print("path: " .. path)
+end
+
 --- This function is called when a worktree is selected in the Telescope picker.
 -- It changes the root directory in Neovim to the selected worktree and updates
 -- the paths of all open buffers.

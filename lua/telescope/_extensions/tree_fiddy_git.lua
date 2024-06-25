@@ -7,7 +7,7 @@ local action_state = require("telescope.actions.state")
 
 local tf = require("TreeFiddyGit")
 
-local tree_fiddy_git = function(opts)
+local get_worktrees = function(opts)
     opts = opts or {}
 
     tf.get_git_worktrees(function(worktrees)
@@ -35,8 +35,45 @@ local tree_fiddy_git = function(opts)
     end)
 end
 
+local create_worktree = function(opts)
+    opts = opts or {}
+
+    tf.get_git_worktrees(function(worktrees)
+        vim.schedule(function()
+            pickers
+                .new(opts, {
+                    prompt_title = "Create Git Worktree",
+                    finder = finders.new_table({
+                        results = worktrees,
+                    }),
+                    sorter = sorters.get_generic_fuzzy_sorter(),
+                    attach_mappings = function(prompt_bufnr, _)
+                        actions.select_default:replace(function()
+                            actions.close(prompt_bufnr)
+                            local branch_name = action_state.get_current_line()
+                            -- local path = vim.fn.input("Enter path to worktree (empty for same as branch name): ")
+                            if branch_name == "" then
+                                return
+                            end
+
+                            local path = vim.fn.input("Enter path to worktree (defaults to " .. branch_name .. "): ")
+
+                            if path == "" then
+                                path = branch_name
+                            end
+                            tf.create_git_worktree(branch_name, path)
+                        end)
+                        return true
+                    end,
+                })
+                :find()
+        end)
+    end)
+end
+
 return telescope.register_extension({
     exports = {
-        tree_fiddy_git = tree_fiddy_git,
+        get_worktrees = get_worktrees,
+        create_worktree = create_worktree,
     },
 })
