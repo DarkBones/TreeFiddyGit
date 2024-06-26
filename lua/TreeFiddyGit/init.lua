@@ -48,8 +48,18 @@ M.get_git_worktrees = function(callback)
 end
 
 M.create_git_worktree = function(branch_name, path)
-    print("branch_name: " .. branch_name)
-    print("path: " .. path)
+    -- git worktree add -b new-branch new-worktree
+    Job:new({
+        command = "git",
+        args = { "worktree", "add", "-b", branch_name, path },
+        on_exit = function(j, return_val)
+            if return_val == 0 then
+                print("Worktree created successfully")
+            else
+                error("Error creating git worktree")
+            end
+        end,
+    }):start()
 end
 
 --- This function is called when a worktree is selected in the Telescope picker.
@@ -61,10 +71,17 @@ end
 M.on_worktree_selected = function(path)
     utils.get_git_root_path(function(git_root)
         local new_git_path = git_root .. "/" .. utils.make_relative(path, ".")
+        vim.schedule(function()
+            vim.cmd(M.config.change_directory_cmd .. " " .. new_git_path)
+        end)
+
         utils.get_git_path(function(old_git_path)
+            if not old_git_path then
+                return
+            end
+
             -- Change the root in vim
             vim.schedule(function()
-                vim.cmd(M.config.change_directory_cmd .. " " .. new_git_path)
                 -- Change the paths of all open buffers
                 for _, bufnr in ipairs(vim.api.nvim_list_bufs()) do
                     if vim.api.nvim_buf_is_valid(bufnr) then

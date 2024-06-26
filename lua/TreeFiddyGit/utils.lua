@@ -49,7 +49,6 @@ end
 -- how deeply nested the current directory is within the worktree.
 -- @param callback function: The callback function to be called with the result.
 M.get_git_path = function(callback)
-    -- TODO: Plenary job
     Job:new({
         command = "git",
         args = { "rev-parse", "--show-toplevel" },
@@ -58,7 +57,7 @@ M.get_git_path = function(callback)
                 local result = j:result()[1]
                 callback(result:match("^%s*(.-)%s*$"))
             else
-                error("Failed to run `git rev-parse --show-toplevel`")
+                callback(nil)
             end
         end
     }):start()
