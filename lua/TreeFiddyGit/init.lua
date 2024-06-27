@@ -11,6 +11,14 @@ M.config = {
 -- TODO: Make a check if the current git repo is supported (bare repo, etc)
 
 -- TODO: Flow for checking out remote branches and treeifying them
+M.checkout_branch = function()
+    -- Prompt the user for the branch name
+    local branch_name = vim.fn.input("Enter the branch name: ")
+
+    utils.git_branch_exists(branch_name, function(exists)
+        print(exists)
+    end)
+end
 
 M.hello = function()
     print("Hello from TreeFiddyGit!")

@@ -44,6 +44,37 @@ M._get_pwd = function(callback)
     }):start()
 end
 
+M.git_branch_exists = function(branch, callback)
+    Job:new({
+        command = "git",
+        args = { "branch", "--list", "-a", branch },
+        on_exit = function(j, return_val)
+            if return_val == 0 then
+                if j:result()[1] == nil then
+                    print(branch .. " not found locally. Checking remote...")
+                    Job:new({
+                        command = "bash",
+                        args = { "-c", "git ls-remote --heads origin " .. branch },
+                        on_exit = function(j, return_val)
+                            if return_val == 0 and j:result()[1] ~= nil then
+                                -- The branch exists on remote
+                                callback(true)
+                            else
+                                -- The branch does not exist on remote
+                                callback(false)
+                            end
+                        end,
+                    }):start()
+                else
+                    callback(true)
+                end
+            else
+                error("Failed to run git branch --list -a " .. branch)
+            end
+        end,
+    }):start()
+end
+
 --- This function returns the actual path of the current git worktree.
 -- The returned path is the root path of the current worktree, regardless of
 -- how deeply nested the current directory is within the worktree.
@@ -59,7 +90,7 @@ M.get_git_path = function(callback)
             else
                 callback(nil)
             end
-        end
+        end,
     }):start()
 end
 
