@@ -54,7 +54,7 @@ M.create_git_worktree = function(branch_name, path)
     Job:new({
         command = "git",
         args = { "worktree", "add", "-b", branch_name, path },
-        on_exit = function(j, return_val)
+        on_exit = function(_, return_val)
             if return_val == 0 then
                 print("Worktree created successfully")
             else
