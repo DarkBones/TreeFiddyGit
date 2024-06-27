@@ -10,6 +10,8 @@ M.config = {
 
 -- TODO: Make a check if the current git repo is supported (bare repo, etc)
 
+-- TODO: Flow for checking out remote branches and treeifying them
+
 M.hello = function()
     print("Hello from TreeFiddyGit!")
 end
