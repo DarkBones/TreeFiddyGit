@@ -16,7 +16,18 @@ M.checkout_branch = function()
     local branch_name = vim.fn.input("Enter the branch name: ")
 
     utils.git_branch_exists(branch_name, function(exists)
-        print(exists)
+        if exists then
+            vim.schedule(function()
+                local path = vim.fn.input("Enter path to worktree (defaults to branch name): ")
+                if path == "" then
+                    path = branch_name
+                end
+                -- create a worktree for the existing branch
+                M.create_git_worktree(branch_name, path, false)
+            end)
+        else
+            print("Branch `" .. branch_name .. "` not found.")
+        end
     end)
 end
 
@@ -57,16 +68,33 @@ M.get_git_worktrees = function(callback)
     }):start()
 end
 
-M.create_git_worktree = function(branch_name, path)
-    -- git worktree add -b new-branch new-worktree
+M.create_git_worktree = function(branch_name, path, is_new_branch)
+    -- git fetch origin branch_name:branch_name
+    -- git worktree add path branch_name
+    local fetch_args = { "fetch", "origin", branch_name .. ":" .. branch_name }
+    local worktree_args = { "worktree", "add", path, branch_name }
+
     Job:new({
         command = "git",
-        args = { "worktree", "add", "-b", branch_name, path },
-        on_exit = function(_, return_val)
+        args = fetch_args,
+        on_exit = function(j, return_val)
             if return_val == 0 then
-                print("Worktree created successfully")
+                print("Branch fetched successfully")
+                Job:new({
+                    command = "git",
+                    args = worktree_args,
+                    on_exit = function(j, return_val)
+                        if return_val == 0 then
+                            print("Worktree created successfully")
+                        else
+                            print("Error creating git worktree. Git error message:")
+                            print(table.concat(j:stderr_result(), "\n"))
+                        end
+                    end,
+                }):start()
             else
-                error("Error creating git worktree")
+                print("Error fetching branch. Git error message:")
+                print(table.concat(j:stderr_result(), "\n"))
             end
         end,
     }):start()
