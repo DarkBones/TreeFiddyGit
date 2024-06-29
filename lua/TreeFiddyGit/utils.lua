@@ -3,6 +3,12 @@ local path_utils = require("plenary.path")
 
 local M = {}
 
+M.BranchLocation = {
+    NONE = 'none',
+    LOCAL = 'local',
+    REMOTE = 'remote'
+}
+
 M.make_relative = function(path, base)
     return path_utils.new(path):make_relative(base)
 end
@@ -82,6 +88,20 @@ M._git_branch_exists_remote = function(branch, callback)
     }):start()
 end
 
+M.create_git_branch = function(branch_name, callback)
+    Job:new({
+        command = "git",
+        args = { "branch", branch_name },
+        on_exit = function(_, return_val)
+            if return_val == 0 then
+                callback(nil, nil)
+            else
+                callback(nil, "Failed to call `git branch " .. branch_name .."`")
+            end
+        end,
+    }):start()
+end
+
 M.git_branch_exists = function(branch, callback)
     M._git_branch_exists_locally(branch, function(exists_locally, err_local)
         if err_local ~= nil then
@@ -90,8 +110,7 @@ M.git_branch_exists = function(branch, callback)
         end
 
         if exists_locally then
-            callback(true, nil)
-            return
+            callback(M.BranchLocation.LOCAL, nil)
         else
             print(branch .. " not found locally. Checking remote...")
             M._git_branch_exists_remote(branch, function(exists_remote, err_remote)
@@ -100,7 +119,11 @@ M.git_branch_exists = function(branch, callback)
                     return
                 end
 
-                callback(exists_remote, nil)
+                if exists_remote then
+                    callback(M.BranchLocation.REMOTE, nil)
+                else
+                    callback(M.BranchLocation.NONE, nil)
+                end
             end)
         end
     end)

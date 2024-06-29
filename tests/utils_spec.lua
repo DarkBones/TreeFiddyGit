@@ -198,7 +198,7 @@ describe("utils", function()
             utils._git_branch_exists_remote = original_git_branch_exists_remote
         end)
 
-        async.tests.it("should return true if the branch exists locally", function()
+        async.tests.it("should return 'local' if the branch exists locally", function()
             utils._git_branch_exists_locally = function(_, callback)
                 vim.schedule(function()
                     callback(true, nil)
@@ -206,10 +206,10 @@ describe("utils", function()
             end
 
             local result = async.wrap(utils.git_branch_exists, 2)("some_branch")
-            assert.is_true(result)
+            assert.are.equal('local', result)
         end)
 
-        async.tests.it("should return true if the branch exists remote", function()
+        async.tests.it("should return 'remote' if the branch exists remote", function()
             utils._git_branch_exists_locally = function(_, callback)
                 vim.schedule(function()
                     callback(false, nil)
@@ -223,10 +223,10 @@ describe("utils", function()
             end
 
             local result = async.wrap(utils.git_branch_exists, 2)("some_branch")
-            assert.is_true(result)
+            assert.are.equal('remote', result)
         end)
 
-        async.tests.it("should return false if the branch does not exist local or remote", function()
+        async.tests.it("should return 'none' if the branch does not exist local or remote", function()
             utils._git_branch_exists_locally = function(_, callback)
                 vim.schedule(function()
                     callback(false, nil)
@@ -240,7 +240,7 @@ describe("utils", function()
             end
 
             local result = async.wrap(utils.git_branch_exists, 2)("some_branch")
-            assert.is_false(result)
+            assert.are.equal('none', result)
         end)
     end)
 end)

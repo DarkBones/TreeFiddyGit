@@ -60,7 +60,7 @@ local create_worktree = function(opts)
                             if path == "" then
                                 path = branch_name
                             end
-                            tf.create_git_worktree(branch_name, path, true)
+                            tf.create_new_git_worktree(branch_name, path)
                         end)
                         return true
                     end,

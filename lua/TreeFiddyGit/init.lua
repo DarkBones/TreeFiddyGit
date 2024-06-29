@@ -17,10 +17,11 @@ M.checkout_branch = function()
     local branch_name = vim.fn.input("Enter the branch name: ")
 
     utils.git_branch_exists(branch_name, function(exists, err)
-        if exists == nil then
+        if err ~= nil then
             vim.schedule(function()
                 vim.api.nvim_err_writeln(err)
             end)
+
             return
         end
 
@@ -31,16 +32,19 @@ M.checkout_branch = function()
                     path = branch_name
                 end
                 -- create a worktree for the existing branch
-                M.create_git_worktree(branch_name, path, false)
+                -- WRONG FUNCTION. This ain't supposed to create a branch!
+                --[[ utils.create_git_branch(branch_name, function(_, err_create)
+                    if err_create ~= nil then
+                        vim.api.nvim_err_writeln(err_create)
+                        return
+                    end
+                end) ]]
+                M.create_git_worktree(branch_name, path)
             end)
         else
             print("Branch `" .. branch_name .. "` not found.")
         end
     end)
-end
-
-M.hello = function()
-    print("Hello from TreeFiddyGit!")
 end
 
 M.setup = function(opts)
@@ -76,7 +80,28 @@ M.get_git_worktrees = function(callback)
     }):start()
 end
 
-M.create_git_worktree = function(branch_name, path, is_new_branch)
+--- This function creates a new git branch and a new git worktree.
+-- The function first creates a new git branch with the given branch name without checking it out.
+-- Then, it creates a new git worktree with the given path.
+-- @param branch_name string: The name of the new git branch to be created.
+-- @param path string: The path where the new git worktree will be created.
+M.create_new_git_worktree = function(branch_name, path)
+    utils.create_git_branch(branch_name, function(_, err)
+        if err ~= nil then
+            vim.api.nvim_err_writeln(err)
+            return
+        end
+
+        M.create_worktree(branch_name, path)
+    end)
+end
+
+M.create_git_worktree = function(branch_name, path)
+    print(branch_name)
+    print(path)
+end
+
+M.create_git_worktree_old = function(branch_name, path, is_new_branch)
     -- git fetch origin branch_name:branch_name
     -- git worktree add path branch_name
     local fetch_args = { "fetch", "origin", branch_name .. ":" .. branch_name }
