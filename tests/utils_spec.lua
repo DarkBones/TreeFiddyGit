@@ -188,4 +188,25 @@ describe("utils", function()
             assert.are.equal("/home/user/gitrepo.git/main/nested/tree", new_path)
         end)
     end)
+
+    describe("git_branch_exists()", function()
+        local original_git_branch_exists_locally = utils._git_branch_exists_locally
+        local original_git_branch_exists_remote = utils._git_branch_exists_remote
+
+        after_each(function()
+            utils._git_branch_exists_locally = original_git_branch_exists_locally
+            utils._git_branch_exists_remote = original_git_branch_exists_remote
+        end)
+
+        async.tests.it("should return true if the branch exists locally", function()
+            utils._git_branch_exists_locally = function(callback)
+                vim.schedule(function()
+                    callback(true, nil)
+                end)
+            end
+
+            local result = async.wrap(utils.git_branch_exists, 1)()
+            assert.is_true(result)
+        end)
+    end)
 end)
