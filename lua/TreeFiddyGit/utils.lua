@@ -44,7 +44,68 @@ M._get_pwd = function(callback)
     }):start()
 end
 
+M._git_branch_exists_locally = function(branch, callback)
+    Job:new({
+        command = "git",
+        args = { "branch", "--list", "-a", branch },
+        on_exit = function(j, return_val)
+            if return_val == 0 then
+                if j:result()[1] == nil then
+                    callback(false, nil)
+                else
+                    callback(true, nil)
+                end
+            else
+                callback(nil, "Failed to run git branch --list -a " .. branch)
+            end
+        end,
+    }):start()
+end
+
+M._git_branch_exists_remote = function(branch, callback)
+    Job:new({
+        command = "bash",
+        args = { "-c", "git ls-remote --heads origin " .. branch },
+        on_exit = function(j, return_val)
+            if return_val == 0 then
+                if j:result()[1] ~= nil then
+                    -- The branch exists on remote
+                    callback(true, nil)
+                else
+                    -- The branch does not exist on remote
+                    callback(false, nil)
+                end
+            else
+                callback(nil, "Failed to call `git ls-remote --heads origin " .. branch)
+            end
+        end,
+    }):start()
+end
+
 M.git_branch_exists = function(branch, callback)
+    M._git_branch_exists_locally(branch, function(exists_locally, err_local)
+        if err_local ~= nil then
+            callback(nil, err_local)
+            return
+        end
+
+        if exists_locally then
+            callback(true, nil)
+        else
+            print(branch .. " not found locally. Checking remote...")
+            M._git_branch_exists_remote(branch, function(exists_remote, err_remote)
+                if err_remote ~= nil then
+                    callback(nil, err_remote)
+                    return
+                end
+
+                callback(exists_remote, nil)
+            end)
+        end
+    end)
+end
+
+M.git_branch_exists_old = function(branch, callback)
     Job:new({
         command = "git",
         args = { "branch", "--list", "-a", branch },
@@ -52,19 +113,21 @@ M.git_branch_exists = function(branch, callback)
             if return_val == 0 then
                 if j:result()[1] == nil then
                     print(branch .. " not found locally. Checking remote...")
-                    Job:new({
-                        command = "bash",
-                        args = { "-c", "git ls-remote --heads origin " .. branch },
-                        on_exit = function(k, return_val_remote)
-                            if return_val_remote == 0 and k:result()[1] ~= nil then
-                                -- The branch exists on remote
-                                callback(true, nil)
-                            else
-                                -- The branch does not exist on remote
-                                callback(false, nil)
-                            end
-                        end,
-                    }):start()
+                    Job
+                        :new({
+                            command = "bash",
+                            args = { "-c", "git ls-remote --heads origin " .. branch },
+                            on_exit = function(k, return_val_remote)
+                                if return_val_remote == 0 and k:result()[1] ~= nil then
+                                    -- The branch exists on remote
+                                    callback(true, nil)
+                                else
+                                    -- The branch does not exist on remote
+                                    callback(false, nil)
+                                end
+                            end,
+                        })
+                        :start()
                 else
                     callback(true, nil)
                 end
