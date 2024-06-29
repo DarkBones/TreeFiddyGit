@@ -4,6 +4,7 @@ local utils = require("TreeFiddyGit.utils")
 
 local M = {}
 
+-- TODO: Make a configurable worktrees folder. Can store them in root, or in root/worktrees
 M.config = {
     change_directory_cmd = "cd",
 }
