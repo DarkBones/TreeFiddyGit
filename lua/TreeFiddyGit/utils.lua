@@ -91,6 +91,7 @@ M.git_branch_exists = function(branch, callback)
 
         if exists_locally then
             callback(true, nil)
+            return
         else
             print(branch .. " not found locally. Checking remote...")
             M._git_branch_exists_remote(branch, function(exists_remote, err_remote)
@@ -103,39 +104,6 @@ M.git_branch_exists = function(branch, callback)
             end)
         end
     end)
-end
-
-M.git_branch_exists_old = function(branch, callback)
-    Job:new({
-        command = "git",
-        args = { "branch", "--list", "-a", branch },
-        on_exit = function(j, return_val)
-            if return_val == 0 then
-                if j:result()[1] == nil then
-                    print(branch .. " not found locally. Checking remote...")
-                    Job
-                        :new({
-                            command = "bash",
-                            args = { "-c", "git ls-remote --heads origin " .. branch },
-                            on_exit = function(k, return_val_remote)
-                                if return_val_remote == 0 and k:result()[1] ~= nil then
-                                    -- The branch exists on remote
-                                    callback(true, nil)
-                                else
-                                    -- The branch does not exist on remote
-                                    callback(false, nil)
-                                end
-                            end,
-                        })
-                        :start()
-                else
-                    callback(true, nil)
-                end
-            else
-                callback(nil, "Failed to run git branch --list -a " .. branch)
-            end
-        end,
-    }):start()
 end
 
 --- This function returns the actual path of the current git worktree.
