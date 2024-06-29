@@ -73,32 +73,47 @@ M.create_git_worktree = function(branch_name, path, is_new_branch)
     -- git fetch origin branch_name:branch_name
     -- git worktree add path branch_name
     local fetch_args = { "fetch", "origin", branch_name .. ":" .. branch_name }
-    local worktree_args = { "worktree", "add", path, branch_name }
+    -- local worktree_args = { "worktree", "add", path, branch_name }
+    local worktree_args = { "worktree", "add" }
+    if is_new_branch then
+        table.insert(worktree_args, "-b")
+    end
+    table.insert(worktree_args, branch_name)
+    table.insert(worktree_args, path)
+    print(vim.inspect(worktree_args))
 
-    Job:new({
-        command = "git",
-        args = fetch_args,
-        on_exit = function(j, return_val)
-            if return_val == 0 then
-                print("Branch fetched successfully")
-                Job:new({
-                    command = "git",
-                    args = worktree_args,
-                    on_exit = function(j, return_val)
-                        if return_val == 0 then
-                            print("Worktree created successfully")
-                        else
-                            print("Error creating git worktree. Git error message:")
-                            print(table.concat(j:stderr_result(), "\n"))
-                        end
-                    end,
-                }):start()
-            else
-                print("Error fetching branch. Git error message:")
-                print(table.concat(j:stderr_result(), "\n"))
-            end
-        end,
-    }):start()
+    utils.get_git_root_path(function(root_dir)
+        if not string.match(path, "^worktrees/") then
+            path = "worktrees/" .. path
+        end
+
+        path = root_dir .. "/" .. path
+
+        Job:new({
+            command = "git",
+            args = fetch_args,
+            on_exit = function(j, return_val)
+                if return_val == 0 then
+                    print("Branch fetched successfully")
+                    Job:new({
+                        command = "git",
+                        args = worktree_args,
+                        on_exit = function(_, return_val)
+                            if return_val == 0 then
+                                print("Worktree created successfully")
+                                M.on_worktree_selected(path)
+                            else
+                                print("Error creating git worktree.")
+                            end
+                        end,
+                    }):start()
+                else
+                    print("Error fetching branch. Git error message:")
+                    print(table.concat(j:stderr_result(), "\n"))
+                end
+            end,
+        }):start()
+    end)
 end
 
 --- This function is called when a worktree is selected in the Telescope picker.
@@ -108,6 +123,10 @@ end
 -- has a random file open and do nothing.
 -- @param path The path of the selected worktree.
 M.on_worktree_selected = function(path)
+    if not string.match(path, "^worktrees/") then
+        path = "worktrees/" .. path
+    end
+
     utils.get_git_root_path(function(git_root)
         local new_git_path = git_root .. "/" .. utils.make_relative(path, ".")
         vim.schedule(function()
