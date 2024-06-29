@@ -1,4 +1,3 @@
-local async = require("plenary.async.tests")
 local assert = require("luassert")
 
 describe("TreeFiddyGit", function()
