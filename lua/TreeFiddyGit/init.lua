@@ -16,7 +16,14 @@ M.checkout_branch = function()
     -- Prompt the user for the branch name
     local branch_name = vim.fn.input("Enter the branch name: ")
 
-    utils.git_branch_exists(branch_name, function(exists)
+    utils.git_branch_exists(branch_name, function(exists, err)
+        if exists == nil then
+            vim.schedule(function()
+                vim.api.nvim_err_writeln(err)
+            end)
+            return
+        end
+
         if exists then
             vim.schedule(function()
                 local path = vim.fn.input("Enter path to worktree (defaults to branch name): ")
@@ -60,10 +67,10 @@ M.get_git_worktrees = function(callback)
             if return_val == 0 then
                 local output = j:result()
                 worktree_parser.parse_worktrees(output, function(parsed_output)
-                    callback(parsed_output)
+                    callback(parsed_output, nil)
                 end)
             else
-                error("Error running git worktree list")
+                callback(nil, "Error running git worktree list")
             end
         end,
     }):start()
@@ -82,7 +89,14 @@ M.create_git_worktree = function(branch_name, path, is_new_branch)
     table.insert(worktree_args, path)
     print(vim.inspect(worktree_args))
 
-    utils.get_git_root_path(function(root_dir)
+    utils.get_git_root_path(function(root_dir, err)
+        if err ~= nil then
+            vim.schedule(function()
+                vim.api.nvim_err_writeln(err)
+            end)
+            return
+        end
+
         if not string.match(path, "^worktrees/") then
             path = "worktrees/" .. path
         end
@@ -127,7 +141,14 @@ M.on_worktree_selected = function(path)
         path = "worktrees/" .. path
     end
 
-    utils.get_git_root_path(function(git_root)
+    utils.get_git_root_path(function(git_root, err)
+        if err ~= nil then
+            vim.schedule(function()
+                vim.api.nvim_err_writeln(err)
+            end)
+            return
+        end
+
         local new_git_path = git_root .. "/" .. utils.make_relative(path, ".")
         vim.schedule(function()
             vim.cmd(M.config.change_directory_cmd .. " " .. new_git_path)

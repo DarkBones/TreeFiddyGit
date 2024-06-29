@@ -20,9 +20,9 @@ M._get_git_worktree_reference = function(callback)
         on_exit = function(j, return_val)
             if return_val == 0 then
                 local result = j:result()[1]
-                callback(result:match("^%s*(.-)%s*$"))
+                callback(result:match("^%s*(.-)%s*$"), nil)
             else
-                error("Failed to run `git rev-parse --git-dir`")
+                callback(nil, "Failed to run `git rev-parse --git-dir`")
             end
         end,
     }):start()
@@ -36,9 +36,9 @@ M._get_pwd = function(callback)
         on_exit = function(j, return_val)
             if return_val == 0 then
                 local result = j:result()[1]
-                callback(result:match("^%s*(.-)%s*$"))
+                callback(result:match("^%s*(.-)%s*$"), nil)
             else
-                error("Failed to run pwd")
+                callback(nil, "Failed to run pwd")
             end
         end,
     }):start()
@@ -55,21 +55,21 @@ M.git_branch_exists = function(branch, callback)
                     Job:new({
                         command = "bash",
                         args = { "-c", "git ls-remote --heads origin " .. branch },
-                        on_exit = function(j, return_val)
-                            if return_val == 0 and j:result()[1] ~= nil then
+                        on_exit = function(k, return_val_remote)
+                            if return_val_remote == 0 and k:result()[1] ~= nil then
                                 -- The branch exists on remote
-                                callback(true)
+                                callback(true, nil)
                             else
                                 -- The branch does not exist on remote
-                                callback(false)
+                                callback(false, nil)
                             end
                         end,
                     }):start()
                 else
-                    callback(true)
+                    callback(true, nil)
                 end
             else
-                error("Failed to run git branch --list -a " .. branch)
+                callback(nil, "Failed to run git branch --list -a " .. branch)
             end
         end,
     }):start()
@@ -86,9 +86,9 @@ M.get_git_path = function(callback)
         on_exit = function(j, return_val)
             if return_val == 0 then
                 local result = j:result()[1]
-                callback(result:match("^%s*(.-)%s*$"))
+                callback(result:match("^%s*(.-)%s*$"), nil)
             else
-                callback(nil)
+                callback(nil, nil)
             end
         end,
     }):start()
@@ -103,26 +103,30 @@ end
 M.get_git_root_path = function(callback)
     M._get_git_worktree_reference(function(root_path)
         if root_path == nil then
-            error("Not in a git repository")
+            callback(nil, "Not in a git repository")
+            return
         end
 
         if root_path == "." then
-            -- local pwd = M._get_pwd()
-            M._get_pwd(function(pwd)
+            M._get_pwd(function(pwd, pwd_err)
+                if pwd == nil then
+                    callback(nil, pwd_err)
+                end
+
                 if pwd:sub(-4) == ".git" then
-                    callback(pwd)
+                    callback(pwd, nil)
                 else
-                    error("Not in a git repository")
+                    callback(nil, "Not in a git repository")
                 end
             end)
         elseif root_path == ".git" then
-            error("Not in a supported git repository. Must be bare")
+            callback(nil, "Not in a supported git repository. Must be bare")
         elseif root_path:find(".git/worktrees/") then
             -- remove the current branch from the path
             root_path = root_path:match("^(.+.git)/worktrees.*")
-            callback(root_path)
+            callback(root_path, nil)
         else
-            error("Failed to get git root path")
+            callback(nil, "Failed to get git root path")
         end
     end)
 end
