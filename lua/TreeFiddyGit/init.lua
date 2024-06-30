@@ -205,17 +205,20 @@ M.on_worktree_selected = function(path, callback)
         utils.get_git_path(function(old_git_path)
             -- Change the paths of all open buffers
             vim.schedule(function()
-                for _, bufnr in ipairs(vim.api.nvim_list_bufs()) do
-                    if vim.api.nvim_buf_is_valid(bufnr) then
-                        local buf_path = vim.api.nvim_buf_get_name(bufnr)
-                        local new_buf_path = utils.update_worktree_buffer_path(old_git_path, wt_path, buf_path)
+                local windows = vim.api.nvim_list_wins()
 
-                        if new_buf_path then
-                            vim.api.nvim_buf_set_name(bufnr, new_buf_path)
-                            vim.api.nvim_command("bufdo e")
-                        end
+                for _, win in ipairs(windows) do
+                    local buf = vim.api.nvim_win_get_buf(win)
+                    local buf_path = vim.api.nvim_buf_get_name(buf)
+                    local new_buf_path = utils.update_worktree_buffer_path(old_git_path, wt_path, buf_path)
+
+                    if new_buf_path then
+                        vim.api.nvim_buf_set_name(buf, new_buf_path)
+                        vim.api.nvim_set_current_win(win)
+                        vim.api.nvim_command("edit")
                     end
                 end
+
                 if callback ~= nil then
                     callback(nil, nil)
                 end
