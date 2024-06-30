@@ -186,9 +186,6 @@ M.get_git_root_path = function(callback)
 end
 
 M.update_worktree_buffer_path = function(old_git_path, new_git_path, buf_path)
-    print("old_git_path: " .. old_git_path)
-    print("new_git_path: " .. new_git_path)
-    print("buf_path: " .. buf_path)
     if buf_path:sub(1, #old_git_path) ~= old_git_path then
         return nil
     end
