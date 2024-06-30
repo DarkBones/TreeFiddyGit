@@ -88,6 +88,59 @@ M._git_branch_exists_remote = function(branch, callback)
     }):start()
 end
 
+M._branch_has_changes = function(callback)
+    Job:new({
+        command = "git",
+        args = { "diff", "--quiet" },
+        on_exit = function(_, return_val)
+            if return_val == 0 then
+                callback(false)
+            else
+                callback(true)
+            end
+        end,
+    }):start()
+end
+
+M.stash = function(callback)
+    M._branch_has_changes(function(has_changes)
+        if not has_changes then
+            callback(false, nil)
+            return
+        end
+
+        Job:new({
+            command = "git",
+            args = { "stash" },
+            on_exit = function(j, return_val)
+                if return_val == 0 then
+                    callback(true, nil)
+                else
+                    callback(nil, "Failed to run `git stash`")
+                end
+            end,
+        }):start()
+    end)
+end
+
+M.stash_pop = function(callback)
+    Job:new({
+        command = "git",
+        args = { "stash", "pop" },
+        on_exit = function(_, return_val)
+            if return_val == 0 then
+                if callback ~= nil then
+                    callback(nil, nil)
+                end
+            else
+                if callback ~= nil then
+                    callback(nil, "Failed to pop stash")
+                end
+            end
+        end,
+    }):start()
+end
+
 M.create_git_branch = function(branch_name, callback)
     Job:new({
         command = "git",

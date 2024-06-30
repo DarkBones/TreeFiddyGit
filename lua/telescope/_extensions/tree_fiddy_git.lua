@@ -35,8 +35,11 @@ local get_worktrees = function(opts)
     end)
 end
 
-local create_worktree = function(opts)
+local create_worktree = function(opts, stash_changes)
     opts = opts or {}
+    if stash_changes == nil then
+        stash_changes = false
+    end
 
     tf.get_git_worktrees(function(worktrees)
         vim.schedule(function()
@@ -60,7 +63,12 @@ local create_worktree = function(opts)
                             if path == "" then
                                 path = branch_name
                             end
-                            tf.create_new_git_worktree(branch_name, path)
+
+                            if stash_changes then
+                                tf.create_new_git_worktree_with_stash(branch_name, path)
+                            else
+                                tf.create_new_git_worktree(branch_name, path)
+                            end
                         end)
                         return true
                     end,
@@ -70,9 +78,14 @@ local create_worktree = function(opts)
     end)
 end
 
+local create_worktree_stash = function(opts)
+    create_worktree(opts, true)
+end
+
 return telescope.register_extension({
     exports = {
         get_worktrees = get_worktrees,
         create_worktree = create_worktree,
+        create_worktree_stash = create_worktree_stash,
     },
 })

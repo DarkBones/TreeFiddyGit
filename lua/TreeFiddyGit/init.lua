@@ -92,7 +92,9 @@ end
 M.create_new_git_worktree = function(branch_name, path)
     utils.create_git_branch(branch_name, function(_, err)
         if err ~= nil then
-            vim.api.nvim_err_writeln(err)
+            vim.schedule(function()
+                vim.api.nvim_err_writeln(err)
+            end)
             return
         end
 
@@ -100,9 +102,48 @@ M.create_new_git_worktree = function(branch_name, path)
     end)
 end
 
--- TODO: New flow similar to `create_new_git_worktree` but stash changes, create worktree, and pop changes
+M.create_new_git_worktree_with_stash = function(branch_name, path)
+    utils.stash(function(has_stashed, err)
+        if err ~= nil then
+            vim.schedule(function()
+                vim.api.nvim_err_writeln(err)
+            end)
+            return
+        end
 
--- TODO: New flow similar to `create_new_git_worktree` but alway create from default branch
+        utils.create_git_branch(branch_name, function(_, err_create)
+            if err_create ~= nil then
+                vim.schedule(function()
+                    vim.api.nvim_err_writeln(err_create)
+                end)
+                utils.stash_pop()
+                return
+            end
+
+            M.create_git_worktree(branch_name, path, function(_, err_wt)
+                if err_wt ~= nil then
+                    if has_stashed then
+                        utils.stash_pop()
+                    end
+                    return
+                end
+
+                if has_stashed then
+                    utils.stash_pop(function(_, err_pop)
+                        if err_pop ~= nil then
+                            vim.schedule(function()
+                                vim.api.nvim_err_writeln(err_pop)
+                            end)
+                            return
+                        end
+
+                        print("successfully moved changes to new worktree")
+                    end)
+                end
+            end)
+        end)
+    end)
+end
 
 --- This function creates a new git worktree from an existing branch.
 -- It first gets the absolute path of the worktree.
@@ -110,7 +151,7 @@ end
 -- If the worktree is created successfully, it switches to the worktree.
 -- @param branch_name string: The name of the existing git branch.
 -- @param path string: The path where the new git worktree will be created.
-M.create_git_worktree = function(branch_name, path)
+M.create_git_worktree = function(branch_name, path, callback)
     utils.get_absolute_wt_path(path, function(wt_path, err)
         if err ~= nil then
             vim.schedule(function()
@@ -122,11 +163,27 @@ M.create_git_worktree = function(branch_name, path)
         Job:new({
             command = "git",
             args = { "worktree", "add", wt_path, branch_name },
-            on_exit = function(_, return_val)
+            on_exit = function(j, return_val)
                 if return_val == 0 then
-                    M.on_worktree_selected(wt_path)
+                    M.on_worktree_selected(wt_path, function(_, err_wt)
+                        if err_wt ~= nil then
+                            if callback ~= nil then
+                                callback(nil, err_wt)
+                                return
+                            end
+                        end
+
+                        if callback ~= nil then
+                            callback(nil, nil)
+                        end
+                    end)
                 else
-                    print("Error creating git worktree.")
+                    local err_msg = "Error creating git worktree at"
+                    print(err_msg)
+                    if callback then
+                        callback(nil, err_msg)
+                        return
+                    end
                 end
             end,
         }):start()
@@ -139,9 +196,8 @@ end
 -- If a buffer's file does not exist in the new worktree, assume the user just
 -- has a random file open and do nothing.
 -- @param path The path of the selected worktree.
-M.on_worktree_selected = function(path)
+M.on_worktree_selected = function(path, callback)
     utils.get_absolute_wt_path(path, function(wt_path)
-        print("ABS PATH: " .. wt_path)
         vim.schedule(function()
             vim.cmd(M.config.change_directory_cmd .. " " .. wt_path)
         end)
@@ -159,6 +215,9 @@ M.on_worktree_selected = function(path)
                             vim.api.nvim_command("bufdo e")
                         end
                     end
+                end
+                if callback ~= nil then
+                    callback(nil, nil)
                 end
             end)
         end)
