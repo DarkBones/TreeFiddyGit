@@ -178,7 +178,7 @@ M.create_git_worktree = function(branch_name, path, callback)
                         end
                     end)
                 else
-                    local err_msg = "Error creating git worktree at"
+                    local err_msg = "Error creating git worktree"
                     print(err_msg)
                     if callback then
                         callback(nil, err_msg)
