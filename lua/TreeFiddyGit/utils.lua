@@ -4,9 +4,9 @@ local path_utils = require("plenary.path")
 local M = {}
 
 M.BranchLocation = {
-    NONE = 'none',
-    LOCAL = 'local',
-    REMOTE = 'remote'
+    NONE = "none",
+    LOCAL = "local",
+    REMOTE = "remote",
 }
 
 M.make_relative = function(path, base)
@@ -96,7 +96,7 @@ M.create_git_branch = function(branch_name, callback)
             if return_val == 0 then
                 callback(nil, nil)
             else
-                callback(nil, "Failed to call `git branch " .. branch_name .."`")
+                callback(nil, "Failed to call `git branch " .. branch_name .. "`")
             end
         end,
     }):start()
@@ -193,6 +193,20 @@ M.update_worktree_buffer_path = function(old_git_path, new_git_path, buf_path)
     local buf_relative_path = buf_path:sub(#old_git_path + 1)
 
     return new_git_path .. buf_relative_path
+end
+
+M.fetch_remote_branch = function(branch_name, callback)
+    Job:new({
+        command = "git",
+        args = { "fetch", "origin", branch_name .. ":" .. branch_name },
+        on_exit = function(_, return_val)
+            if return_val == 0 then
+                callback(nil, nil)
+            else
+                callback(nil, "Failed to run `git fetch origin " .. branch_name .. ":" .. branch_name .. "`")
+            end
+        end,
+    }):start()
 end
 
 return M

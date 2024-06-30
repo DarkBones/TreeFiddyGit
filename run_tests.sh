@@ -2,4 +2,4 @@
 
 clear
 
-nvim --headless -c "PlenaryBustedDirectory tests { minimal_init = './tests/minimal_init.lua' }"
+nvim --headless -c "PlenaryBustedDirectory tests { minimal_init = './tests/minimal_init.lua' } -luacov"

@@ -31,15 +31,18 @@ M.checkout_branch = function()
                 if path == "" then
                     path = branch_name
                 end
-                -- create a worktree for the existing branch
-                -- WRONG FUNCTION. This ain't supposed to create a branch!
-                --[[ utils.create_git_branch(branch_name, function(_, err_create)
-                    if err_create ~= nil then
-                        vim.api.nvim_err_writeln(err_create)
+
+                utils.fetch_remote_branch(branch_name, function(_, err)
+                    if err ~= nil then
+                        vim.schedule(function()
+                            vim.api.nvim_err_writeln(err)
+                        end)
                         return
                     end
-                end) ]]
-                M.create_git_worktree(branch_name, path)
+
+                    -- create a worktree for the existing branch
+                    M.create_git_worktree(branch_name, path)
+                end)
             end)
         else
             print("Branch `" .. branch_name .. "` not found.")
