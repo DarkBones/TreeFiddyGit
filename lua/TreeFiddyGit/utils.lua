@@ -186,6 +186,9 @@ M.get_git_root_path = function(callback)
 end
 
 M.update_worktree_buffer_path = function(old_git_path, new_git_path, buf_path)
+    print("old_git_path: " .. old_git_path)
+    print("new_git_path: " .. new_git_path)
+    print("buf_path: " .. buf_path)
     if buf_path:sub(1, #old_git_path) ~= old_git_path then
         return nil
     end
@@ -207,6 +210,36 @@ M.fetch_remote_branch = function(branch_name, callback)
             end
         end,
     }):start()
+end
+
+M.get_absolute_wt_path = function(path, callback)
+    if string.sub(path, 1, 1) == "." then
+        path = string.sub(path, 2)
+    end
+
+    if string.sub(path, 1, 1) == "/" then
+        path = string.sub(path, 2)
+    end
+
+
+    -- if not string.match(path, "^worktrees/") then
+    --     path = "worktrees" .. path
+    -- end
+
+    M.get_git_root_path(function(root_path, err)
+        if err ~= nil then
+            vim.schedule(function()
+                vim.api.nvim_err_writeln(err)
+            end)
+            callback(nil, err)
+        end
+
+        if string.sub(path, 1, #root_path) ~= root_path then
+            path = root_path .. "/" .. path
+        end
+
+        callback(path, nil)
+    end)
 end
 
 return M

@@ -165,39 +165,22 @@ end
 -- has a random file open and do nothing.
 -- @param path The path of the selected worktree.
 M.on_worktree_selected = function(path)
-    if not string.match(path, "^worktrees/") then
-        path = "worktrees/" .. path
-    end
-
-    utils.get_git_root_path(function(git_root, err)
-        if err ~= nil then
-            vim.schedule(function()
-                vim.api.nvim_err_writeln(err)
-            end)
-            return
-        end
-
-        local new_git_path = git_root .. "/" .. utils.make_relative(path, ".")
+    utils.get_absolute_wt_path(path, function(wt_path)
         vim.schedule(function()
-            vim.cmd(M.config.change_directory_cmd .. " " .. new_git_path)
+            vim.cmd(M.config.change_directory_cmd .. " " .. wt_path)
         end)
 
         utils.get_git_path(function(old_git_path)
-            if not old_git_path then
-                return
-            end
-
-            -- Change the root in vim
+            -- Change the paths of all open buffers
             vim.schedule(function()
-                -- Change the paths of all open buffers
                 for _, bufnr in ipairs(vim.api.nvim_list_bufs()) do
                     if vim.api.nvim_buf_is_valid(bufnr) then
                         local buf_path = vim.api.nvim_buf_get_name(bufnr)
-                        local new_buf_path = utils.update_worktree_buffer_path(old_git_path, new_git_path, buf_path)
+                        local new_buf_path = utils.update_worktree_buffer_path(old_git_path, wt_path, buf_path)
 
                         if new_buf_path then
                             vim.api.nvim_buf_set_name(bufnr, new_buf_path)
-                            vim.api.nvim_command("edit!")
+                            vim.api.nvim_command("bufdo e")
                         end
                     end
                 end
