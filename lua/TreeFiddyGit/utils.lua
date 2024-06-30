@@ -210,18 +210,9 @@ M.fetch_remote_branch = function(branch_name, callback)
 end
 
 M.get_absolute_wt_path = function(path, callback)
-    if string.sub(path, 1, 1) == "." then
-        path = string.sub(path, 2)
+    if string.sub(path, 1, 2) == "./" then
+        path = string.sub(path, 3)
     end
-
-    if string.sub(path, 1, 1) == "/" then
-        path = string.sub(path, 2)
-    end
-
-
-    -- if not string.match(path, "^worktrees/") then
-    --     path = "worktrees" .. path
-    -- end
 
     M.get_git_root_path(function(root_path, err)
         if err ~= nil then

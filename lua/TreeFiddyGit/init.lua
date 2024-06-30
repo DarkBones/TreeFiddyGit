@@ -84,8 +84,9 @@ M.get_git_worktrees = function(callback)
 end
 
 --- This function creates a new git branch and a new git worktree.
--- The function first creates a new git branch with the given branch name without checking it out.
+-- It first creates a new git branch with the given branch name without checking it out.
 -- Then, it creates a new git worktree with the given path.
+-- Finally, it switches to the new worktree.
 -- @param branch_name string: The name of the new git branch to be created.
 -- @param path string: The path where the new git worktree will be created.
 M.create_new_git_worktree = function(branch_name, path)
@@ -95,29 +96,22 @@ M.create_new_git_worktree = function(branch_name, path)
             return
         end
 
-        M.create_worktree(branch_name, path)
+        M.create_git_worktree(branch_name, path)
     end)
 end
 
+-- TODO: New flow similar to `create_new_git_worktree` but stash changes, create worktree, and pop changes
+
+-- TODO: New flow similar to `create_new_git_worktree` but alway create from default branch
+
+--- This function creates a new git worktree from an existing branch.
+-- It first gets the absolute path of the worktree.
+-- It creates a new git worktree at the absolute path with the branch name.
+-- If the worktree is created successfully, it switches to the worktree.
+-- @param branch_name string: The name of the existing git branch.
+-- @param path string: The path where the new git worktree will be created.
 M.create_git_worktree = function(branch_name, path)
-    print(branch_name)
-    print(path)
-end
-
-M.create_git_worktree_old = function(branch_name, path, is_new_branch)
-    -- git fetch origin branch_name:branch_name
-    -- git worktree add path branch_name
-    local fetch_args = { "fetch", "origin", branch_name .. ":" .. branch_name }
-    -- local worktree_args = { "worktree", "add", path, branch_name }
-    local worktree_args = { "worktree", "add" }
-    if is_new_branch then
-        table.insert(worktree_args, "-b")
-    end
-    table.insert(worktree_args, branch_name)
-    table.insert(worktree_args, path)
-    print(vim.inspect(worktree_args))
-
-    utils.get_git_root_path(function(root_dir, err)
+    utils.get_absolute_wt_path(path, function(wt_path, err)
         if err ~= nil then
             vim.schedule(function()
                 vim.api.nvim_err_writeln(err)
@@ -125,33 +119,14 @@ M.create_git_worktree_old = function(branch_name, path, is_new_branch)
             return
         end
 
-        if not string.match(path, "^worktrees/") then
-            path = "worktrees/" .. path
-        end
-
-        path = root_dir .. "/" .. path
-
         Job:new({
             command = "git",
-            args = fetch_args,
-            on_exit = function(j, return_val)
+            args = { "worktree", "add", wt_path, branch_name },
+            on_exit = function(_, return_val)
                 if return_val == 0 then
-                    print("Branch fetched successfully")
-                    Job:new({
-                        command = "git",
-                        args = worktree_args,
-                        on_exit = function(_, return_val)
-                            if return_val == 0 then
-                                print("Worktree created successfully")
-                                M.on_worktree_selected(path)
-                            else
-                                print("Error creating git worktree.")
-                            end
-                        end,
-                    }):start()
+                    M.on_worktree_selected(wt_path)
                 else
-                    print("Error fetching branch. Git error message:")
-                    print(table.concat(j:stderr_result(), "\n"))
+                    print("Error creating git worktree.")
                 end
             end,
         }):start()
@@ -166,6 +141,7 @@ end
 -- @param path The path of the selected worktree.
 M.on_worktree_selected = function(path)
     utils.get_absolute_wt_path(path, function(wt_path)
+        print("ABS PATH: " .. wt_path)
         vim.schedule(function()
             vim.cmd(M.config.change_directory_cmd .. " " .. wt_path)
         end)
