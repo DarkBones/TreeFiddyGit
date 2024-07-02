@@ -7,6 +7,10 @@ local M = {}
 -- TODO: Make a configurable worktrees folder. Can store them in root, or in root/worktrees
 M.config = {
     change_directory_cmd = "cd",
+    pre_create_worktree_hook = nil,
+    post_create_worktree_hook = nil,
+    pre_move_to_new_worktree_hook = nil,
+    post_move_to_new_worktree_hook = nil,
 }
 
 -- TODO: Make a check if the current git repo is supported (bare repo, etc)
@@ -54,13 +58,7 @@ M.setup = function(opts)
     opts = opts or {}
     local options = M.config
 
-    for k, v in pairs(options) do
-        if opts[k] == nil then
-            opts[k] = v
-        else
-            options[k] = opts[k]
-        end
-    end
+    options = utils.merge_tables(options, opts)
 
     M.config = options
     require("telescope").load_extension("tree_fiddy_git")
@@ -160,10 +158,25 @@ M.create_git_worktree = function(branch_name, path, callback)
             return
         end
 
+        local data_pre_create = {
+            branch_name = branch_name,
+            path = path,
+            abs_path = wt_path,
+        }
+
+        utils.run_hook(M.config.pre_create_worktree_hook, data_pre_create)
+
         Job:new({
             command = "git",
             args = { "worktree", "add", wt_path, branch_name },
-            on_exit = function(j, return_val)
+            on_exit = function(_, return_val)
+                local data_post_create = {
+                    return_val = return_val,
+                }
+                data_post_create = utils.merge_tables(data_post_create, data_pre_create)
+
+                utils.run_hook(M.config.post_create_worktree_hook, data_post_create)
+
                 if return_val == 0 then
                     M.on_worktree_selected(wt_path, function(_, err_wt)
                         if err_wt ~= nil then
