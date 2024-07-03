@@ -9,8 +9,8 @@ M.config = {
     change_directory_cmd = "cd",
     pre_create_worktree_hook = nil,
     post_create_worktree_hook = nil,
-    pre_move_to_new_worktree_hook = nil,
-    post_move_to_new_worktree_hook = nil,
+    pre_move_to_worktree_hook = nil,
+    post_move_to_worktree_hook = nil,
 }
 
 -- TODO: Make a check if the current git repo is supported (bare repo, etc)
@@ -174,11 +174,10 @@ M.create_git_worktree = function(branch_name, path, callback)
                     return_val = return_val,
                 }
                 data_post_create = utils.merge_tables(data_post_create, data_pre_create)
-
                 utils.run_hook(M.config.post_create_worktree_hook, data_post_create)
 
                 if return_val == 0 then
-                    M.on_worktree_selected(wt_path, function(_, err_wt)
+                    M.move_to_worktree(wt_path, function(_, err_wt)
                         if err_wt ~= nil then
                             if callback ~= nil then
                                 callback(nil, err_wt)
@@ -209,8 +208,14 @@ end
 -- If a buffer's file does not exist in the new worktree, assume the user just
 -- has a random file open and do nothing.
 -- @param path The path of the selected worktree.
-M.on_worktree_selected = function(path, callback)
+M.move_to_worktree = function(path, callback)
     utils.get_absolute_wt_path(path, function(wt_path)
+        local data_pre_move = {
+            path = path,
+            absolute_path = wt_path,
+        }
+        utils.run_hook(M.config.pre_move_to_worktree_hook, data_pre_move)
+
         vim.schedule(function()
             vim.cmd(M.config.change_directory_cmd .. " " .. wt_path)
         end)
@@ -231,6 +236,12 @@ M.on_worktree_selected = function(path, callback)
                         vim.api.nvim_command("edit")
                     end
                 end
+
+                local data_post_move = {
+                    previous_path = old_git_path,
+                }
+                data_post_move = utils.merge_tables(data_post_move, data_pre_move)
+                utils.run_hook(M.config.post_move_to_worktree_hook, data_post_move)
 
                 if callback ~= nil then
                     callback(nil, nil)
