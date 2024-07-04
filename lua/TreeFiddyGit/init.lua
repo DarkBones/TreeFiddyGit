@@ -20,6 +20,10 @@ M.checkout_branch = function()
     -- Prompt the user for the branch name
     local branch_name = vim.fn.input("Enter the branch name: ")
 
+    if branch_name == "" then
+        return
+    end
+
     utils.git_branch_exists(branch_name, function(exists, err)
         if err ~= nil then
             vim.schedule(function()
@@ -29,17 +33,17 @@ M.checkout_branch = function()
             return
         end
 
-        if exists then
+        if exists ~= "none" then
             vim.schedule(function()
                 local path = vim.fn.input("Enter path to worktree (defaults to branch name): ")
                 if path == "" then
                     path = branch_name
                 end
 
-                utils.fetch_remote_branch(branch_name, function(_, err)
-                    if err ~= nil then
+                utils.fetch_remote_branch(branch_name, function(_, err_fetch)
+                    if err_fetch ~= nil then
                         vim.schedule(function()
-                            vim.api.nvim_err_writeln(err)
+                            vim.api.nvim_err_writeln(err_fetch)
                         end)
                         return
                     end
