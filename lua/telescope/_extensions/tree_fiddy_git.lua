@@ -24,8 +24,9 @@ local get_worktrees = function(opts)
                             actions.close(prompt_bufnr)
                             local selection = action_state.get_selected_entry()
                             local message = selection[1]
-                            local _, wt_path = message:match("([^%s]+)%s+([^%s]+)")
-                            tf.move_to_worktree(wt_path)
+                            local branch_name, path = message:match("([^%s]+)%s+([^%s]+)")
+
+                            tf.move_to_worktree(branch_name, path)
                         end)
                         return true
                     end,

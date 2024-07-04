@@ -195,7 +195,6 @@ M.create_git_worktree = function(branch_name, path, callback)
                     end)
                 else
                     local err_msg = "Error creating git worktree"
-                    print(err_msg)
                     if callback then
                         callback(nil, err_msg)
                         return
@@ -212,44 +211,55 @@ end
 -- If a buffer's file does not exist in the new worktree, assume the user just
 -- has a random file open and do nothing.
 -- @param path The path of the selected worktree.
-M.move_to_worktree = function(path, callback)
-    utils.get_absolute_wt_path(path, function(wt_path)
-        local data_pre_move = {
-            path = path,
-            absolute_path = wt_path,
-        }
-        utils.run_hook(M.config.pre_move_to_worktree_hook, data_pre_move)
-
-        vim.schedule(function()
-            vim.cmd(M.config.change_directory_cmd .. " " .. wt_path)
-        end)
-
-        utils.get_git_path(function(old_git_path)
-            -- Change the paths of all open buffers
+M.move_to_worktree = function(branch_name, path, callback)
+    utils.current_branch(function(old_branch, err_curr_branch)
+        if err_curr_branch ~= nil then
             vim.schedule(function()
-                local windows = vim.api.nvim_list_wins()
+                vim.api.nvim_err_writeln(err_curr_branch)
+            end)
+            return
+        end
 
-                for _, win in ipairs(windows) do
-                    local buf = vim.api.nvim_win_get_buf(win)
-                    local buf_path = vim.api.nvim_buf_get_name(buf)
-                    local new_buf_path = utils.update_worktree_buffer_path(old_git_path, wt_path, buf_path)
+        utils.get_absolute_wt_path(path, function(wt_path)
+            local data_pre_move = {
+                old_branch = old_branch,
+                new_branch = branch_name,
+                path = path,
+                absolute_path = wt_path,
+            }
+            utils.run_hook(M.config.pre_move_to_worktree_hook, data_pre_move)
 
-                    if new_buf_path then
-                        vim.api.nvim_buf_set_name(buf, new_buf_path)
-                        vim.api.nvim_set_current_win(win)
-                        vim.api.nvim_command("edit")
+            vim.schedule(function()
+                vim.cmd(M.config.change_directory_cmd .. " " .. wt_path)
+            end)
+
+            utils.get_git_path(function(old_git_path)
+                -- Change the paths of all open buffers
+                vim.schedule(function()
+                    local windows = vim.api.nvim_list_wins()
+
+                    for _, win in ipairs(windows) do
+                        local buf = vim.api.nvim_win_get_buf(win)
+                        local buf_path = vim.api.nvim_buf_get_name(buf)
+                        local new_buf_path = utils.update_worktree_buffer_path(old_git_path, wt_path, buf_path)
+
+                        if new_buf_path then
+                            vim.api.nvim_buf_set_name(buf, new_buf_path)
+                            vim.api.nvim_set_current_win(win)
+                            vim.api.nvim_command("edit")
+                        end
                     end
-                end
 
-                local data_post_move = {
-                    previous_path = old_git_path,
-                }
-                data_post_move = utils.merge_tables(data_post_move, data_pre_move)
-                utils.run_hook(M.config.post_move_to_worktree_hook, data_post_move)
+                    local data_post_move = {
+                        previous_path = old_git_path,
+                    }
+                    data_post_move = utils.merge_tables(data_post_move, data_pre_move)
+                    utils.run_hook(M.config.post_move_to_worktree_hook, data_post_move)
 
-                if callback ~= nil then
-                    callback(nil, nil)
-                end
+                    if callback ~= nil then
+                        callback(nil, nil)
+                    end
+                end)
             end)
         end)
     end)

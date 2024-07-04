@@ -182,6 +182,21 @@ M.git_branch_exists = function(branch, callback)
     end)
 end
 
+M.current_branch = function(callback)
+    Job:new({
+        command = "git",
+        args = { "branch", "--show-current" },
+        on_exit = function(j, return_val)
+            if return_val == 0 then
+                local result = j:result()[1]
+                callback(result:match("^%s*(.-)%s*$"), nil)
+            else
+                callback(nil, "Failed to run `git branch --show-current`")
+            end
+        end
+    }):start()
+end
+
 --- This function returns the actual path of the current git worktree.
 -- The returned path is the root path of the current worktree, regardless of
 -- how deeply nested the current directory is within the worktree.
