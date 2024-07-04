@@ -7,6 +7,10 @@ local action_state = require("telescope.actions.state")
 
 local tf = require("TreeFiddyGit")
 
+local parse_selection = function(selection)
+    return selection[1]:match("([^%s]+)%s+([^%s]+)")
+end
+
 local get_worktrees = function(opts)
     opts = opts or {}
 
@@ -19,15 +23,29 @@ local get_worktrees = function(opts)
                         results = worktrees,
                     }),
                     sorter = sorters.get_generic_fuzzy_sorter(),
-                    attach_mappings = function(prompt_bufnr, _)
+                    attach_mappings = function(prompt_bufnr, map)
                         actions.select_default:replace(function()
                             actions.close(prompt_bufnr)
                             local selection = action_state.get_selected_entry()
-                            local message = selection[1]
-                            local branch_name, path = message:match("([^%s]+)%s+([^%s]+)")
+                            local branch_name, path = parse_selection(selection)
 
                             tf.move_to_worktree(branch_name, path)
                         end)
+
+                        map("i", "<C-d>", function()
+                            local selection = action_state.get_selected_entry()
+                            if selection then
+                                vim.ui.select({ "Yes", "No" }, {
+                                    prompt = "Are you sure you want to delete this worktree?",
+                                }, function(choice)
+                                    if choice == "Yes" then
+                                        local branch_name, path = parse_selection(selection)
+                                        tf.delete_worktree(branch_name, path)
+                                    end
+                                end)
+                            end
+                        end)
+
                         return true
                     end,
                 })
