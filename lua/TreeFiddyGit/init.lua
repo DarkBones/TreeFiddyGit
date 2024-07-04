@@ -7,6 +7,10 @@ local M = {}
 -- TODO: Make a configurable worktrees folder. Can store them in root, or in root/worktrees
 M.config = {
     change_directory_cmd = "cd",
+    pre_create_worktree_hook = nil,
+    post_create_worktree_hook = nil,
+    pre_move_to_worktree_hook = nil,
+    post_move_to_worktree_hook = nil,
 }
 
 -- TODO: Make a check if the current git repo is supported (bare repo, etc)
@@ -15,6 +19,10 @@ M.config = {
 M.checkout_branch = function()
     -- Prompt the user for the branch name
     local branch_name = vim.fn.input("Enter the branch name: ")
+
+    if branch_name == "" then
+        return
+    end
 
     utils.git_branch_exists(branch_name, function(exists, err)
         if err ~= nil then
@@ -25,17 +33,17 @@ M.checkout_branch = function()
             return
         end
 
-        if exists then
+        if exists ~= "none" then
             vim.schedule(function()
                 local path = vim.fn.input("Enter path to worktree (defaults to branch name): ")
                 if path == "" then
                     path = branch_name
                 end
 
-                utils.fetch_remote_branch(branch_name, function(_, err)
-                    if err ~= nil then
+                utils.fetch_remote_branch(branch_name, function(_, err_fetch)
+                    if err_fetch ~= nil then
                         vim.schedule(function()
-                            vim.api.nvim_err_writeln(err)
+                            vim.api.nvim_err_writeln(err_fetch)
                         end)
                         return
                     end
@@ -54,13 +62,7 @@ M.setup = function(opts)
     opts = opts or {}
     local options = M.config
 
-    for k, v in pairs(options) do
-        if opts[k] == nil then
-            opts[k] = v
-        else
-            options[k] = opts[k]
-        end
-    end
+    options = utils.merge_tables(options, opts)
 
     M.config = options
     require("telescope").load_extension("tree_fiddy_git")
@@ -160,12 +162,26 @@ M.create_git_worktree = function(branch_name, path, callback)
             return
         end
 
+        local data_pre_create = {
+            branch_name = branch_name,
+            path = path,
+            abs_path = wt_path,
+        }
+
+        utils.run_hook(M.config.pre_create_worktree_hook, data_pre_create)
+
         Job:new({
             command = "git",
             args = { "worktree", "add", wt_path, branch_name },
-            on_exit = function(j, return_val)
+            on_exit = function(_, return_val)
+                local data_post_create = {
+                    return_val = return_val,
+                }
+                data_post_create = utils.merge_tables(data_post_create, data_pre_create)
+                utils.run_hook(M.config.post_create_worktree_hook, data_post_create)
+
                 if return_val == 0 then
-                    M.on_worktree_selected(wt_path, function(_, err_wt)
+                    M.move_to_worktree(wt_path, function(_, err_wt)
                         if err_wt ~= nil then
                             if callback ~= nil then
                                 callback(nil, err_wt)
@@ -178,8 +194,7 @@ M.create_git_worktree = function(branch_name, path, callback)
                         end
                     end)
                 else
-                    local err_msg = "Error creating git worktree at"
-                    print(err_msg)
+                    local err_msg = "Error creating git worktree"
                     if callback then
                         callback(nil, err_msg)
                         return
@@ -196,29 +211,55 @@ end
 -- If a buffer's file does not exist in the new worktree, assume the user just
 -- has a random file open and do nothing.
 -- @param path The path of the selected worktree.
-M.on_worktree_selected = function(path, callback)
-    utils.get_absolute_wt_path(path, function(wt_path)
-        vim.schedule(function()
-            vim.cmd(M.config.change_directory_cmd .. " " .. wt_path)
-        end)
-
-        utils.get_git_path(function(old_git_path)
-            -- Change the paths of all open buffers
+M.move_to_worktree = function(branch_name, path, callback)
+    utils.current_branch(function(old_branch, err_curr_branch)
+        if err_curr_branch ~= nil then
             vim.schedule(function()
-                for _, bufnr in ipairs(vim.api.nvim_list_bufs()) do
-                    if vim.api.nvim_buf_is_valid(bufnr) then
-                        local buf_path = vim.api.nvim_buf_get_name(bufnr)
+                vim.api.nvim_err_writeln(err_curr_branch)
+            end)
+            return
+        end
+
+        utils.get_absolute_wt_path(path, function(wt_path)
+            local data_pre_move = {
+                old_branch = old_branch,
+                new_branch = branch_name,
+                path = path,
+                absolute_path = wt_path,
+            }
+            utils.run_hook(M.config.pre_move_to_worktree_hook, data_pre_move)
+
+            vim.schedule(function()
+                vim.cmd(M.config.change_directory_cmd .. " " .. wt_path)
+            end)
+
+            utils.get_git_path(function(old_git_path)
+                -- Change the paths of all open buffers
+                vim.schedule(function()
+                    local windows = vim.api.nvim_list_wins()
+
+                    for _, win in ipairs(windows) do
+                        local buf = vim.api.nvim_win_get_buf(win)
+                        local buf_path = vim.api.nvim_buf_get_name(buf)
                         local new_buf_path = utils.update_worktree_buffer_path(old_git_path, wt_path, buf_path)
 
                         if new_buf_path then
-                            vim.api.nvim_buf_set_name(bufnr, new_buf_path)
-                            vim.api.nvim_command("bufdo e")
+                            vim.api.nvim_buf_set_name(buf, new_buf_path)
+                            vim.api.nvim_set_current_win(win)
+                            vim.api.nvim_command("edit")
                         end
                     end
-                end
-                if callback ~= nil then
-                    callback(nil, nil)
-                end
+
+                    local data_post_move = {
+                        previous_path = old_git_path,
+                    }
+                    data_post_move = utils.merge_tables(data_post_move, data_pre_move)
+                    utils.run_hook(M.config.post_move_to_worktree_hook, data_post_move)
+
+                    if callback ~= nil then
+                        callback(nil, nil)
+                    end
+                end)
             end)
         end)
     end)

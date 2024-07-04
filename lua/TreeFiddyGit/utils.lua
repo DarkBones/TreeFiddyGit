@@ -112,7 +112,7 @@ M.stash = function(callback)
         Job:new({
             command = "git",
             args = { "stash" },
-            on_exit = function(j, return_val)
+            on_exit = function(_, return_val)
                 if return_val == 0 then
                     callback(true, nil)
                 else
@@ -180,6 +180,21 @@ M.git_branch_exists = function(branch, callback)
             end)
         end
     end)
+end
+
+M.current_branch = function(callback)
+    Job:new({
+        command = "git",
+        args = { "branch", "--show-current" },
+        on_exit = function(j, return_val)
+            if return_val == 0 then
+                local result = j:result()[1]
+                callback(result:match("^%s*(.-)%s*$"), nil)
+            else
+                callback(nil, "Failed to run `git branch --show-current`")
+            end
+        end
+    }):start()
 end
 
 --- This function returns the actual path of the current git worktree.
@@ -281,6 +296,23 @@ M.get_absolute_wt_path = function(path, callback)
 
         callback(path, nil)
     end)
+end
+
+M.run_hook = function(hook, data)
+    if hook ~= nil then
+        if type(hook) == "string" then
+            os.execute(hook)
+        elseif type(hook) == "function" then
+            hook(data)
+        end
+    end
+end
+
+M.merge_tables = function (t1, t2)
+    for k, v in pairs(t2) do
+        t1[k] = v
+    end
+    return t1
 end
 
 return M
