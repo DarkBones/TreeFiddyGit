@@ -11,7 +11,19 @@ M.config = {
     post_create_worktree_hook = nil,
     pre_move_to_worktree_hook = nil,
     post_move_to_worktree_hook = nil,
+    pre_delete_worktree_hook = nil,
+    post_delete_worktree_hook = nil,
 }
+
+M.setup = function(opts)
+    opts = opts or {}
+    local options = M.config
+
+    options = utils.merge_tables(options, opts)
+
+    M.config = options
+    require("telescope").load_extension("tree_fiddy_git")
+end
 
 -- TODO: Make a check if the current git repo is supported (bare repo, etc)
 
@@ -56,16 +68,6 @@ M.checkout_branch = function()
             print("Branch `" .. branch_name .. "` not found.")
         end
     end)
-end
-
-M.setup = function(opts)
-    opts = opts or {}
-    local options = M.config
-
-    options = utils.merge_tables(options, opts)
-
-    M.config = options
-    require("telescope").load_extension("tree_fiddy_git")
 end
 
 M.get_git_worktrees = function(callback)
@@ -260,6 +262,49 @@ M.move_to_worktree = function(branch_name, path, callback)
                         callback(nil, nil)
                     end
                 end)
+            end)
+        end)
+    end)
+end
+
+M.delete_worktree = function(branch_name, path)
+    utils.current_branch(function(current_branch, err_current_branch)
+        if err_current_branch ~= nil then
+            vim.schedule(function()
+                vim.api.nvim_err_writeln(err_current_branch)
+            end)
+            return
+        end
+
+        utils.get_absolute_wt_path(path, function(wt_path)
+            local data_pre_delete = {
+                current_branch = current_branch,
+                branch = branch_name,
+                path = path,
+                absolute_path = wt_path,
+            }
+            utils.run_hook(M.config.pre_delete_worktree_hook, data_pre_delete)
+
+            utils.remove_worktree(path, function(_, err_remove)
+                if err_remove ~= nil then
+                    local force = vim.fn.input("Failed to remove. Try to force? [y/n]: ")
+                    if string.lower(force) ~= "y" then
+                        return
+                    end
+
+                    utils.force_delete_worktree(path, function(_, err_force)
+                        if err_force ~= nil then
+                            vim.schedule(function()
+                                vim.api.nvim_err_writeln(err_force)
+                            end)
+                            return
+                        end
+
+                        utils.run_hook(M.config.post_delete_worktree_hook, data_pre_delete)
+                    end)
+                end
+
+                utils.run_hook(M.config.post_delete_worktree_hook, data_pre_delete)
             end)
         end)
     end)

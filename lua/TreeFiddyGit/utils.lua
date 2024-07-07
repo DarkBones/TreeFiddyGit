@@ -216,6 +216,34 @@ M.get_git_path = function(callback)
     }):start()
 end
 
+M.delete_worktree = function(path, callback)
+    Job:new({
+        command = "git",
+        args = { "worktree", "remove", path },
+        on_exit = function(j, return_val)
+            if return_val == 0 then
+                callback(nil, nil)
+            else
+                callback(nil, "Failed to run git worktree remove")
+            end
+        end
+    }):start()
+end
+
+M.force_delete_worktree = function(path, callback)
+    Job:new({
+        command = "git",
+        args = { "worktree", "remove", path, "--force" },
+        on_exit = function(j, return_val)
+            if return_val == 0 then
+                callback(nil, nil)
+            else
+                callback(nil, "Failed to run git worktree remove --force")
+            end
+        end
+    }):start()
+end
+
 --- This function returns the root path of the current git repository.
 -- No matter where the command is run from, it will always get the root path of the git repository.
 -- If a tree is nested in another tree, it won't affect the result.
@@ -254,6 +282,10 @@ M.get_git_root_path = function(callback)
 end
 
 M.update_worktree_buffer_path = function(old_git_path, new_git_path, buf_path)
+    if old_git_path == nil then
+        return nil
+    end
+
     if buf_path:sub(1, #old_git_path) ~= old_git_path then
         return nil
     end
