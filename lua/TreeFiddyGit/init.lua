@@ -183,7 +183,7 @@ M.create_git_worktree = function(branch_name, path, callback)
                 utils.run_hook(M.config.post_create_worktree_hook, data_post_create)
 
                 if return_val == 0 then
-                    M.move_to_worktree(wt_path, function(_, err_wt)
+                    M.move_to_worktree(branch_name, wt_path, function(_, err_wt)
                         if err_wt ~= nil then
                             if callback ~= nil then
                                 callback(nil, err_wt)
@@ -224,6 +224,7 @@ M.move_to_worktree = function(branch_name, path, callback)
             return
         end
 
+        print("PATH: " .. path)
         utils.get_absolute_wt_path(path, function(wt_path)
             local data_pre_move = {
                 new_path = wt_path,
