@@ -304,25 +304,29 @@ M.delete_worktree = function(branch_name, path)
             }
             utils.run_hook(M.config.pre_delete_worktree_hook, data_pre_delete)
 
-            utils.remove_worktree(path, function(_, err_remove)
+            utils.delete_worktree(wt_path, function(_, err_remove)
                 if err_remove ~= nil then
-                    local force = vim.fn.input("Failed to remove. Try to force? [y/n]: ")
-                    if string.lower(force) ~= "y" then
-                        return
-                    end
-
-                    utils.force_delete_worktree(path, function(_, err_force)
-                        if err_force ~= nil then
-                            vim.schedule(function()
-                                vim.api.nvim_err_writeln(err_force)
-                            end)
+                    vim.schedule(function()
+                        local force = vim.fn.input("Failed to remove. Try to force? [y/n]: ")
+                        if string.lower(force) ~= "y" then
                             return
                         end
 
-                        utils.run_hook(M.config.post_delete_worktree_hook, data_pre_delete)
+                        utils.force_delete_worktree(wt_path, function(_, err_force)
+                            if err_force ~= nil then
+                                vim.schedule(function()
+                                    vim.api.nvim_err_writeln(err_force)
+                                end)
+                                return
+                            end
+
+                            print("Worktree " .. path .. " successfully removed")
+                            utils.run_hook(M.config.post_delete_worktree_hook, data_pre_delete)
+                        end)
                     end)
                 end
 
+                print("Worktree " .. path .. " successfully removed")
                 utils.run_hook(M.config.post_delete_worktree_hook, data_pre_delete)
             end)
         end)

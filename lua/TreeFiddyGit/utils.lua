@@ -246,7 +246,7 @@ M.force_delete_worktree = function(path, callback)
             if return_val == 0 then
                 callback(nil, nil)
             else
-                callback(nil, "Failed to run git worktree remove --force")
+                callback(nil, "Failed to run `git worktree remove " .. path .. " --force`")
             end
         end
     }):start()
