@@ -164,46 +164,59 @@ M.create_git_worktree = function(branch_name, path, callback)
             return
         end
 
-        local data_pre_create = {
-            branch_name = branch_name,
-            path = path,
-            abs_path = wt_path,
-        }
+        utils.current_branch_and_path(function(branch_and_path, err_curr_branch)
+            local old_branch, old_path = branch_and_path[1], branch_and_path[2]
 
-        utils.run_hook(M.config.pre_create_worktree_hook, data_pre_create)
+            if err_curr_branch ~= nil then
+                vim.schedule(function()
+                    vim.api.nvim_err_writeln(err_curr_branch)
+                end)
+                return
+            end
 
-        Job:new({
-            command = "git",
-            args = { "worktree", "add", wt_path, branch_name },
-            on_exit = function(_, return_val)
-                local data_post_create = {
-                    return_val = return_val,
-                }
-                data_post_create = utils.merge_tables(data_post_create, data_pre_create)
-                utils.run_hook(M.config.post_create_worktree_hook, data_post_create)
+            local data_pre_create = {
+                new_branch = branch_name,
+                new_path = wt_path,
+                old_branch = old_branch,
+                old_path = old_path,
+                path = path,
+            }
 
-                if return_val == 0 then
-                    M.move_to_worktree(branch_name, wt_path, function(_, err_wt)
-                        if err_wt ~= nil then
-                            if callback ~= nil then
-                                callback(nil, err_wt)
-                                return
+            utils.run_hook(M.config.pre_create_worktree_hook, data_pre_create)
+
+            Job:new({
+                command = "git",
+                args = { "worktree", "add", wt_path, branch_name },
+                on_exit = function(_, return_val)
+                    local data_post_create = {
+                        return_val = return_val,
+                    }
+                    data_post_create = utils.merge_tables(data_post_create, data_pre_create)
+                    utils.run_hook(M.config.post_create_worktree_hook, data_post_create)
+
+                    if return_val == 0 then
+                        M.move_to_worktree(branch_name, wt_path, function(_, err_wt)
+                            if err_wt ~= nil then
+                                if callback ~= nil then
+                                    callback(nil, err_wt)
+                                    return
+                                end
                             end
-                        end
 
-                        if callback ~= nil then
-                            callback(nil, nil)
+                            if callback ~= nil then
+                                callback(nil, nil)
+                            end
+                        end)
+                    else
+                        local err_msg = "Error creating git worktree"
+                        if callback then
+                            callback(nil, err_msg)
+                            return
                         end
-                    end)
-                else
-                    local err_msg = "Error creating git worktree"
-                    if callback then
-                        callback(nil, err_msg)
-                        return
                     end
-                end
-            end,
-        }):start()
+                end,
+            }):start()
+        end)
     end)
 end
 
