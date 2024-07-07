@@ -214,7 +214,9 @@ end
 -- has a random file open and do nothing.
 -- @param path The path of the selected worktree.
 M.move_to_worktree = function(branch_name, path, callback)
-    utils.current_branch(function(old_branch, err_curr_branch)
+    utils.current_branch_and_path(function(old_branch_and_path, err_curr_branch)
+        local old_branch, old_path = old_branch_and_path[1], old_branch_and_path[2]
+
         if err_curr_branch ~= nil then
             vim.schedule(function()
                 vim.api.nvim_err_writeln(err_curr_branch)
@@ -224,10 +226,11 @@ M.move_to_worktree = function(branch_name, path, callback)
 
         utils.get_absolute_wt_path(path, function(wt_path)
             local data_pre_move = {
-                old_branch = old_branch,
+                new_path = wt_path,
                 new_branch = branch_name,
+                old_branch = old_branch,
+                old_path = old_path,
                 path = path,
-                absolute_path = wt_path,
             }
             utils.run_hook(M.config.pre_move_to_worktree_hook, data_pre_move)
 
@@ -268,7 +271,9 @@ M.move_to_worktree = function(branch_name, path, callback)
 end
 
 M.delete_worktree = function(branch_name, path)
-    utils.current_branch(function(current_branch, err_current_branch)
+    utils.current_branch_and_path(function(cur_branch_and_path, err_current_branch)
+        local current_branch = cur_branch_and_path[1]
+
         if err_current_branch ~= nil then
             vim.schedule(function()
                 vim.api.nvim_err_writeln(err_current_branch)

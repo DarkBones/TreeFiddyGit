@@ -182,14 +182,22 @@ M.git_branch_exists = function(branch, callback)
     end)
 end
 
-M.current_branch = function(callback)
+M.current_branch_and_path = function(callback)
     Job:new({
         command = "git",
         args = { "branch", "--show-current" },
         on_exit = function(j, return_val)
             if return_val == 0 then
                 local result = j:result()[1]
-                callback(result:match("^%s*(.-)%s*$"), nil)
+                local current_branch = result:match("^%s*(.-)%s*$")
+                M._get_pwd(function(current_path, err_pwd)
+                    if err_pwd ~= nil then
+                        callback(nil, err_pwd)
+                        return
+                    end
+
+                    callback({ current_branch, current_path }, nil)
+                end)
             else
                 callback(nil, "Failed to run `git branch --show-current`")
             end
