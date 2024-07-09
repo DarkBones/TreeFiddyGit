@@ -4,7 +4,6 @@ local utils = require("TreeFiddyGit.utils")
 
 local M = {}
 
--- TODO: Make a configurable worktrees folder. Can store them in root, or in root/worktrees
 M.config = {
     change_directory_cmd = "cd",
     hook = nil,
@@ -20,9 +19,6 @@ M.setup = function(opts)
     require("telescope").load_extension("tree_fiddy_git")
 end
 
--- TODO: Make a check if the current git repo is supported (bare repo, etc)
-
--- TODO: Flow for checking out remote branches and treeifying them
 M.checkout_branch = function(hook_path)
     -- Prompt the user for the branch name
     local branch_name = vim.fn.input("Enter the branch name: ")
