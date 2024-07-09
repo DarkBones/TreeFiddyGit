@@ -3,6 +3,8 @@
 ## Overview
 **TreeFiddyGit** is a Neovim plugin designed to make managing git worktrees as seamless as using regular branches. It aims to simplify your workflow by providing a 1:1 relationship between branches and worktrees. This means that every branch you create or check out will exist in its own worktree, giving you an isolated environment for each branch.
 
+**This plugin is very much still in development**
+
 Key features include:
 - **1:1 Branch to Worktree Relationship**: Every branch you create or check out will be in a new worktree, ensuring clean and isolated development environments.
 - **Telescope Integration**: Move between worktrees using a handy Telescope picker.
