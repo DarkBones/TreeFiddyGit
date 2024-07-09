@@ -90,9 +90,9 @@ Here’s an example of how you can set up a hook in the plugin configuration:
 require("TreeFiddyGit").setup({
     hook = function(action, data)
         if action == "post-create" then
-            print("A new worktree has been created: " .. data.worktree)
+            print("A new worktree has been created: " .. data.path)
         elseif action == "pre-checkout" then
-            print("About to check out branch: " .. data.branch)
+            print("About to check out branch: " .. data.new_branch)
         end
     end,
 })
