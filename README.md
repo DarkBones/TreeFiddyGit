@@ -1,23 +1,21 @@
 # TreeFiddyGit
 
-# Overview
+## Overview
 **TreeFiddyGit** is a Neovim plugin designed to make managing git worktrees as seamless as using regular branches. It aims to simplify your workflow by providing a 1:1 relationship between branches and worktrees. This means that every branch you create or check out will exist in its own worktree, giving you an isolated environment for each branch.
 
 Key features include:
 - **1:1 Branch to Worktree Relationship**: Every branch you create or check out will be in a new worktree, ensuring clean and isolated development environments.
 - **Telescope Integration**: Move between worktrees using a handy Telescope picker.
 - **Branch-Based Worktree Creation**: When creating a new branch, the new branch and its corresponding worktree are based on the branch you currently have checked out.
-- **[Custom Hooks](#hooks) for Enhanced Functionality**: TreeFiddyGit supports custom hooks that allow you to add your own functionality before and after key actions. (More details below, and examples in the wiki).
-
-[comment]: <> (TODO: Link examples)
+- **[Custom Hooks](#hooks) for Enhanced Functionality**: TreeFiddyGit supports custom hooks that allow you to add your own functionality before and after key actions. (More details below).
 
 TreeFiddyGit simplifies the complexity of worktree management, letting you focus on coding rather than juggling multiple git environments.
 
-# Installation
+## Installation
 You can install **TreeFiddyGit** using various package managers. Below are instructions for some common ones:
 
 
-## LazyVim
+### LazyVim
 To install with LazyVim, add the following to your LazyVim configuration:
 ```lua
 return {
@@ -31,7 +29,7 @@ return {
 }
 ```
 
-## Packer
+### Packer
 To install with Packer, add the following to your `init.lua` or `plugins.lua`:
 ```lua
 use {
@@ -43,7 +41,7 @@ use {
 }
 ```
 
-## Vim-Plug
+### Vim-Plug
 To install with Vim-Plug, add the following to your `init.vim`:
 ```vim
 Plug 'nvim-telescope/telescope.nvim'
@@ -54,7 +52,7 @@ require("TreeFiddyGit").setup()
 EOF
 ```
 
-# Usage
+## Usage
 | Command                            | Description                      |
 |------------------------------------|----------------------------------|
 | `:Telescope tree_fiddy_git get_worktrees` | List and switch between worktrees |
@@ -64,24 +62,67 @@ EOF
 
 These commands can be mapped to your preferred keybindings.
 
+### Hooks
+TreeFiddyGit provides a robust hooks system that allows you to execute custom functionality before and after key actions. Hooks are called with two parameters: `action` and `data`.
 
-############################################
+- **`action`**: A string representing the action that just occurred.
+- **`data`**: Additional data related to the action (details vary by action).
 
-If you need to pull remote branches, don't forget to add this line to the config under `[remote "origin"]`:
-`fetch = +refs/heads/*:refs/remotes/origin/*`
+The available action values are:
+| Action Value                     | Description                                               |
+|----------------------------------|-----------------------------------------------------------|
+| `pre-checkout`                   | Before checking out a branch                              |
+| `post-checkout`                  | After checking out a branch                               |
+| `pre-create`                     | Before creating a new worktree                            |
+| `post-create`                    | After creating a new worktree                             |
+| `pre-move`                       | Before moving to an existing worktree                     |
+| `post-move`                      | After moving to an existing worktree                      |
+| `pre-delete`                     | Before deleting a worktree                                |
+| `post-delete`                    | After deleting a worktree                                 |
+| `create.pre-move`                | Before moving to the new worktree right after creating it |
+| `create.post-move`               | After moving to the new worktree right after creating it  |
+| `checkout.create.pre-move`       | Before moving to the new worktree right after checking out a branch |
+| `checkout.create.post-move`      | After moving to the new worktree right after checking out a branch  |
 
-Example config:
+#### Example Hook
+Here’s an example of how you can set up a hook in the plugin configuration:
+```lua
+require("TreeFiddyGit").setup({
+    hook = function(action, data)
+        if action == "post-create" then
+            print("A new worktree has been created: " .. data.worktree)
+        elseif action == "pre-checkout" then
+            print("About to check out branch: " .. data.branch)
+        end
+    end,
+})
 ```
+
+This setup will print a message whenever a new worktree is created or a branch is about to be checked out. You can customize the `hook` function to suit your specific needs.
+
+### Remote Branch Configuration
+If you need to pull remote branches, make sure to add the following line to the `[remote "origin"]` section of your Git configuration:
+```ini
+fetch = +refs/heads/*:refs/remotes/origin/*
+```
+
+Here’s an example configuration file:
+```ini
 [core]
 	repositoryformatversion = 0
 	filemode = true
 	bare = true
 	ignorecase = true
 	precomposeunicode = true
+
+
 [remote "origin"]
 	url = git@github.com:username/repo.git
 	fetch = +refs/heads/*:refs/remotes/origin/*
+
+
 [branch "main"]
 	remote = origin
 	merge = refs/heads/main
 ```
+This ensures that all branches are fetched from the remote repository, allowing you to work seamlessly with TreeFiddyGit.
