@@ -1,0 +1,14 @@
+pre-checkout
+post-checkout
+pre-create
+post-create
+pre-move
+post-move
+pre-delete
+post-delete
+
+create.pre-move
+create.post-move
+
+checkout.create.pre-move
+checkout.create.post-move
