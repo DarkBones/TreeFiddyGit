@@ -338,12 +338,12 @@ M.get_absolute_wt_path = function(path, callback)
     end)
 end
 
-M.run_hook = function(hook, data)
+M.run_hook = function(hook, action, data)
     if hook ~= nil then
         if type(hook) == "string" then
             os.execute(hook)
         elseif type(hook) == "function" then
-            hook(data)
+            hook(action, data)
         end
     end
 end
@@ -353,6 +353,10 @@ M.merge_tables = function (t1, t2)
         t1[k] = v
     end
     return t1
+end
+
+M.merge_hook_path = function(path, hook)
+    return path and (path .. "." .. hook) or hook
 end
 
 return M
