@@ -64,6 +64,8 @@ EOF
 
 These commands can be mapped to your preferred keybindings.
 
+You can delete a worktree by bringing up the telescope window with `:Telescope tree_fiddy_git get_worktrees` and pressing `C-d` on the highlighted tree.
+
 ### Hooks
 TreeFiddyGit provides a robust hooks system that allows you to execute custom functionality before and after key actions. Hooks are called with two parameters: `action` and `data`.
 
