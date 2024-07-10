@@ -1,4 +1,4 @@
-*TreeFiddyGit.txt*    A git worktree plugin for neovim
+*TreeFiddyGit*    A git worktree plugin for neovim
 
 ==============================================================================
 1. Contents                                                        *TreeFiddyGit-contents*
