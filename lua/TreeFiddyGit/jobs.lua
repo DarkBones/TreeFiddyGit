@@ -82,7 +82,7 @@ function M.get_git_root_path(callback)
                     callback(pwd, nil)
                 end)
             end)
-        elseif git_ref[1]:find(".git/worktrees/") then
+        elseif git_ref[1]:find(".+%.git/worktrees/") or git_ref[1]:find(".+%.git/worktrees$") then
             local root_path = git_ref[1]:match("^(.-%.git)/worktrees")
             callback(root_path, nil)
         elseif git_ref[1] == ".git" then
