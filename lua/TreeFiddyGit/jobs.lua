@@ -56,23 +56,19 @@ end
 
 function M.get_git_root_path(callback)
     M._get_git_worktree_reference(function(git_ref, git_ref_err)
-        print("git_ref: " .. vim.inspect(git_ref))
-        print("git_reff_err: " .. vim.inspect(git_ref_err))
-
         if git_ref == nil then
             callback(nil, git_ref_err)
             return
         end
 
         if git_ref[1] == "." then
-            print("dot found")
             M._in_bare_repo(function(is_bare, is_bare_err)
                 if is_bare_err ~= nil then
                     callback(nil, is_bare_err)
                     return
                 end
 
-                if is_bare == false then
+                if is_bare[1] ~= "true" then
                     callback(nil, "Not in a supported git repository")
                     return
                 end
@@ -80,11 +76,19 @@ function M.get_git_root_path(callback)
                 M._git_pwd(function(pwd, pwd_err)
                     if pwd_err ~= nil then
                         callback(nil, pwd_err)
+                        return
                     end
 
                     callback(pwd, nil)
                 end)
             end)
+        elseif git_ref[1]:find(".git/worktrees/") then
+            local root_path = git_ref[1]:match("^(.-%.git)/worktrees")
+            callback(root_path, nil)
+        elseif git_ref[1] == ".git" then
+            callback(nil, "Must be in a bare repo")
+        else
+            callback(nil, "Failed to get git root path")
         end
     end)
 end
