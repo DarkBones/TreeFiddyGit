@@ -46,6 +46,11 @@ function M._git_pwd(callback)
     M._run_job("pwd", nil, callback)
 end
 
+--- Checks if the current directory is a bare Git repository.
+-- A bare repository is a Git repository that doesn't have a working directory.
+-- This function returns true if the current directory is a bare repository, and false otherwise.
+-- /some/path/to/a_bare_repo.git >> true
+-- /some/path/to/a_bare_repo.git/main >> false
 function M._in_bare_repo(callback)
     M._run_job("git", { "rev-parse", "--is-bare-repository" }, callback)
 end
@@ -54,6 +59,11 @@ function M.get_worktrees(callback)
     M._run_job("git", { "worktree", "list" }, callback)
 end
 
+--- This function returns the root path of the current git repository.
+-- No matter where the command is run from, it will always get the root path of the git repository.
+-- If a tree is nested in another tree, it won't affect the result.
+-- If a user is in some deeply nested directory, it will still only return the root path
+-- If the current directory is not a supported (bare) git repository, it throws an error.
 function M.get_git_root_path(callback)
     M._get_git_worktree_reference(function(git_ref, git_ref_err)
         if git_ref == nil then
