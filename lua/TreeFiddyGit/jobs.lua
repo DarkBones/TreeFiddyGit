@@ -1,8 +1,10 @@
 local Job = require("plenary.job")
+local logger = require("TreeFiddyGit.logger")
 
 local M = {}
 
 function M._run_job(command, args, callback)
+    logger.log("INFO", "jobs.run_job")
     local err_message = ""
 
     Job
@@ -65,7 +67,15 @@ end
 -- If a user is in some deeply nested directory, it will still only return the root path
 -- If the current directory is not a supported (bare) git repository, it throws an error.
 function M.get_git_root_path(callback)
+    logger.log(logger.LogLevel.DEBUG, "jobs.get_git_root_path", "getting git root path")
+
     M._get_git_worktree_reference(function(git_ref, git_ref_err)
+        logger.log(
+            logger.LogLevel.DEBUG,
+            "jobs.get_git_root_path",
+            "_get_git_worktree_reference returned: " .. vim.inspect({ git_ref, git_ref_err })
+        )
+
         if git_ref == nil then
             callback(nil, git_ref_err)
             return
