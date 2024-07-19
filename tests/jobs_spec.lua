@@ -75,7 +75,7 @@ describe("jobs", function()
                 end)
 
                 local result, err = async.wrap(jobs.get_git_root_path, 1)()
-                assert.are.equal("the/path/returned/by/pwd.git", result[1])
+                assert.are.equal("the/path/returned/by/pwd.git", result)
                 assert.is_nil(err)
             end)
 

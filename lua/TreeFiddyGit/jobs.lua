@@ -7,34 +7,32 @@ function M._run_job(command, args, callback)
     logger.log("INFO", "jobs.run_job")
     local err_message = ""
 
-    Job
-        :new({
-            command = command,
-            args = args,
-            on_stderr = function(_, data)
-                err_message = err_message .. "\n" .. data
-            end,
-            on_exit = function(j, return_val)
-                if return_val ~= 0 then
-                    local full_err_msg = "Error running`"
-                        .. command
-                        .. " "
-                        .. table.concat(args, " ")
-                        .. "`"
-                        .. err_message
+    Job:new({
+        command = command,
+        args = args,
+        on_stderr = function(_, data)
+            err_message = err_message .. "\n" .. data
+        end,
+        on_exit = function(j, return_val)
+            if return_val ~= 0 then
+                local full_err_msg = "Error running `"
+                    .. command
+                    .. " "
+                    .. table.concat(args, " ")
+                    .. "`"
+                    .. err_message
 
-                    logger.log(logger.LogLevel.ERROR, "jobs._run_job", err_message)
+                logger.log(logger.LogLevel.ERROR, "jobs._run_job", err_message)
 
-                    callback(nil, full_err_msg)
+                callback(nil, full_err_msg)
 
-                    return
-                end
+                return
+            end
 
-                local error_arg = err_message ~= "" and err_message or nil
-                callback(j:result(), error_arg)
-            end,
-        })
-        :start()
+            local error_arg = err_message ~= "" and err_message or nil
+            callback(j:result(), error_arg)
+        end,
+    }):start()
 end
 
 --- This function returns a reference to the current git worktree.
@@ -44,11 +42,36 @@ end
 -- is deeply nested in other worktrees.
 -- @param callback function: The callback function to be called with the result.
 function M._get_git_worktree_reference(callback)
-    M._run_job("git", { "rev-parse", "--git-dir" }, callback)
+    M._run_job("git", { "rev-parse", "--git-dir" }, function(res, err)
+        logger.log(
+            logger.LogLevel.DEBUG,
+            "jobs._get_git_worktree_reference",
+            "jobs._get_git_worktree_reference returned: " .. vim.inspect({ res, err })
+        )
+
+        if err ~= nil then
+            logger.log(logger.LogLevel.ERROR, "jobs._get_git_worktree_reference", err)
+            callback(nil, err)
+            return
+        end
+
+        callback(res, nil)
+    end)
 end
 
 function M._get_pwd(callback)
-    M._run_job("pwd", nil, callback)
+    -- M._run_job("pwd", nil, callback)
+    M._run_job("pwd", nil, function(res, err)
+        logger.log(logger.LogLevel.DEBUG, "jobs._get_pwd", "jobs._get_pwd returned: " .. vim.inspect({ res, err }))
+
+        if err ~= nil then
+            logger.log(logger.LogLevel.ERROR, "jobs._get_pwd", err)
+            callback(nil, err)
+            return
+        end
+
+        callback(res, nil)
+    end)
 end
 
 --- Checks if the current directory is a bare Git repository.
@@ -57,11 +80,100 @@ end
 -- /some/path/to/a_bare_repo.git >> true
 -- /some/path/to/a_bare_repo.git/main >> false
 function M._in_bare_repo(callback)
-    M._run_job("git", { "rev-parse", "--is-bare-repository" }, callback)
+    M._run_job("git", { "rev-parse", "--is-bare-repository" }, function(res, err)
+        logger.log(
+            logger.LogLevel.DEBUG,
+            "jobs._in_bare_repo",
+            "jobs._in_bare_repo returned: " .. vim.inspect({ res, err })
+        )
+
+        if err ~= nil then
+            logger.log(logger.LogLevel.ERROR, "jobs._in_bare_repo", err)
+            callback(nil, err)
+            return
+        end
+
+        callback(res, nil)
+    end)
+end
+
+function M._branch_has_changes(callback)
+    M._run_job("git", { "diff", "--quiet" }, function(_, err)
+        if err then
+            if err ~= "Error running `git diff --quiet`" then
+                callback(nil, err)
+                return
+            end
+
+            logger.log(logger.LogLevel.INFO, "jobs._branch_has_changes", "Branch has changes")
+            callback(true, nil)
+            return
+        end
+
+        logger.log(logger.LogLevel.INFO, "jobs._branch_has_changes", "Branch has no changes")
+        callback(false, nil)
+    end)
 end
 
 function M.get_worktrees(callback)
-    M._run_job("git", { "worktree", "list" }, callback)
+    M._run_job("git", { "worktree", "list" }, function(res, err)
+        if err ~= nil then
+            logger.log(logger.LogLevel.ERROR, "jobs.get_worktrees", err)
+            callback(nil, err)
+            return
+        end
+
+        callback(res, nil)
+    end)
+end
+
+function M.git_path(callback)
+    M._run_job("git", { "rev-parse", "--show-toplevel" }, function(res, err)
+        if err ~= nil then
+            logger.log(logger.LogLevel.ERROR, "jobs.git_path", err)
+            callback(nil, nil)
+            return
+        end
+
+        callback(res, nil)
+    end)
+end
+
+function M.delete_worktree(worktree_path, callback)
+    M._run_job("git", { "worktree", "remove", worktree_path }, function(_, err)
+        if err ~= nil then
+            if not err:find("--force") then
+                logger.log(logger.Log.ERROR, "jobs.delete_worktree", err)
+                callback(nil, err)
+                return
+            end
+
+            logger.log(logger.LogLevel.WARN, "jobs.delete_worktree", err)
+
+            vim.schedule(function()
+                local force = vim.fn.input("Worktree is not clean. Do you want to force delete it? (y/n): ")
+                if string.lower(force) ~= "y" then
+                    logger.log(logger.LogLevel.INFO, "jobs.delete_worktree", "User chose not to force delete worktree")
+                    callback(false, nil)
+                    return
+                end
+
+                M._run_job("git", { "worktree", "remove", "--force", worktree_path }, function(_, force_err)
+                    if force_err ~= nil then
+                        logger.log(logger.LogLevel.ERROR, "jobs.delete_worktree", force_err)
+                        callback(nil, force_err)
+                        return
+                    end
+
+                    logger.log(logger.LogLevel.INFO, "jobs.delete_worktree", "Worktree deleted successfully")
+                    callback(true, nil)
+                end)
+            end)
+        end
+
+        logger.log(logger.LogLevel.INFO, "jobs.delete_worktree", "Worktree deleted successfully")
+        callback(true, nil)
+    end)
 end
 
 --- This function returns the root path of the current git repository.
@@ -73,36 +185,14 @@ function M.get_git_root_path(callback)
     logger.log(logger.LogLevel.DEBUG, "jobs.get_git_root_path", "getting git root path")
 
     M._get_git_worktree_reference(function(git_ref, git_ref_err)
-        logger.log(
-            logger.LogLevel.DEBUG,
-            "jobs.get_git_root_path",
-            "_get_git_worktree_reference returned: " .. vim.inspect({ git_ref, git_ref_err })
-        )
-
         if git_ref_err ~= nil then
-            logger.log(
-                logger.LogLevel.ERROR,
-                "jobs.get_git_root_path",
-                "_get_git_worktree_reference failed with: " .. vim.inspect(git_ref_err)
-            )
             callback(nil, git_ref_err)
             return
         end
 
         if git_ref[1] == "." then
             M._in_bare_repo(function(is_bare, is_bare_err)
-                logger.log(
-                    logger.LogLevel.DEBUG,
-                    "jobs.get_git_root_path",
-                    "_is_bare_repo returned: " .. vim.inspect({ is_bare, is_bare_err })
-                )
-
                 if is_bare_err ~= nil then
-                    logger.log(
-                        logger.LogLevel.ERROR,
-                        "jobs.get_git_root_path",
-                        "is_bare_repo failed with: " .. vim.inspect(is_bare_err)
-                    )
                     callback(nil, is_bare_err)
                     return
                 end
@@ -115,24 +205,13 @@ function M.get_git_root_path(callback)
                 end
 
                 M._get_pwd(function(pwd, pwd_err)
-                    logger.log(
-                        logger.LogLevel.DEBUG,
-                        "jobs.get_git_root_path",
-                        "_get_pwd returned: " .. vim.inspect({ pwd, pwd_err })
-                    )
-
                     if pwd_err ~= nil then
-                        logger.log(
-                            logger.LogLevel.ERROR,
-                            "jobs.get_git_root_path",
-                            "_get_pwd failed with: " .. vim.inspect(pwd_err)
-                        )
                         callback(nil, pwd_err)
                         return
                     end
 
                     logger.log(logger.LogLevel.INFO, "jobs.get_git_root_path", "found root path: " .. vim.inspect(pwd))
-                    callback(pwd, nil)
+                    callback(pwd[1], nil)
                 end)
             end)
         elseif git_ref[1]:find(".+%.git/worktrees/") or git_ref[1]:find(".+%.git/worktrees$") then
@@ -148,6 +227,88 @@ function M.get_git_root_path(callback)
             logger.log(logger.LogLevel.ERROR, "jobs.get_git_root_path", err_message)
             callback(nil, err_message)
         end
+    end)
+end
+
+function M.current_branch_and_path(callback)
+    M._run_job("git", { "branch", "--show-current" }, function(cur_branch, err_curr_branch)
+        if err_curr_branch ~= nil then
+            logger.log(logger.LogLevel.ERROR, "jobs.current_branch_and_path", err_curr_branch)
+            callback(nil, err_curr_branch)
+            return
+        end
+
+        M._get_pwd(function(pwd, err_pwd)
+            if err_pwd ~= nil then
+                callback(nil, err_pwd)
+                return
+            end
+
+            callback({ cur_branch[1], pwd[1] })
+        end)
+    end)
+end
+
+function M.create_git_branch(branch_name, callback)
+    M._run_job("git", { "branch", branch_name }, function(_, err)
+        if err ~= nil and not err:find("already exists") then
+            logger.log(logger.LogLevel.ERROR, "jobs.create_git_branch", err)
+            callback(nil, err)
+            return
+        end
+
+        callback(true, nil)
+    end)
+end
+
+function M.create_worktree(branch_and_path, callback)
+    local branch_name = branch_and_path.branch_name
+    local path = branch_and_path.path
+
+    M._run_job("git", { "worktree", "add", path, branch_name }, function(_, err)
+        if err and not string.find(err, "Preparing worktree") then
+            logger.log(logger.LogLevel.ERROR, "jobs.create_worktree", err)
+            callback(nil, err)
+            return
+        end
+
+        callback(true, nil)
+    end)
+end
+
+function M.stash(callback)
+    M._branch_has_changes(function(has_changes, err_has_changes)
+        if err_has_changes then
+            callback(nil, err_has_changes)
+            return
+        end
+
+        if not has_changes then
+            callback(false, nil)
+            return
+        end
+
+        M._run_job("git", { "stash" }, function(_, err_stash)
+            if err_stash then
+                logger.log(logger.LogLevel.ERROR, "jobs.stash", err_stash)
+                callback(nil, err_stash)
+                return
+            end
+
+            callback(true, nil)
+        end)
+    end)
+end
+
+function M.pop_stash(callback)
+    M._run_job("git", { "stash", "pop" }, function(_, err)
+        if err then
+            logger.log(logger.LogLevel.ERROR, "jobs.pop_stash", err)
+            callback(nil, err)
+            return
+        end
+
+        callback(true, nil)
     end)
 end
 
