@@ -22,6 +22,9 @@ function M._run_job(command, args, callback)
                         .. table.concat(args, " ")
                         .. "`"
                         .. err_message
+
+                    logger.log(logger.LogLevel.ERROR, "jobs._run_job", err_message)
+
                     callback(nil, full_err_msg)
 
                     return
@@ -44,7 +47,7 @@ function M._get_git_worktree_reference(callback)
     M._run_job("git", { "rev-parse", "--git-dir" }, callback)
 end
 
-function M._git_pwd(callback)
+function M._get_pwd(callback)
     M._run_job("pwd", nil, callback)
 end
 
@@ -76,39 +79,74 @@ function M.get_git_root_path(callback)
             "_get_git_worktree_reference returned: " .. vim.inspect({ git_ref, git_ref_err })
         )
 
-        if git_ref == nil then
+        if git_ref_err ~= nil then
+            logger.log(
+                logger.LogLevel.ERROR,
+                "jobs.get_git_root_path",
+                "_get_git_worktree_reference failed with: " .. vim.inspect(git_ref_err)
+            )
             callback(nil, git_ref_err)
             return
         end
 
         if git_ref[1] == "." then
             M._in_bare_repo(function(is_bare, is_bare_err)
+                logger.log(
+                    logger.LogLevel.DEBUG,
+                    "jobs.get_git_root_path",
+                    "_is_bare_repo returned: " .. vim.inspect({ is_bare, is_bare_err })
+                )
+
                 if is_bare_err ~= nil then
+                    logger.log(
+                        logger.LogLevel.ERROR,
+                        "jobs.get_git_root_path",
+                        "is_bare_repo failed with: " .. vim.inspect(is_bare_err)
+                    )
                     callback(nil, is_bare_err)
                     return
                 end
 
                 if is_bare[1] ~= "true" then
-                    callback(nil, "Not in a supported git repository")
+                    local err_message = "Not in a supported git repository"
+                    logger.log(logger.LogLevel.ERROR, "jobs.get_git_root_path", err_message)
+                    callback(nil, err_message)
                     return
                 end
 
-                M._git_pwd(function(pwd, pwd_err)
+                M._get_pwd(function(pwd, pwd_err)
+                    logger.log(
+                        logger.LogLevel.DEBUG,
+                        "jobs.get_git_root_path",
+                        "_get_pwd returned: " .. vim.inspect({ pwd, pwd_err })
+                    )
+
                     if pwd_err ~= nil then
+                        logger.log(
+                            logger.LogLevel.ERROR,
+                            "jobs.get_git_root_path",
+                            "_get_pwd failed with: " .. vim.inspect(pwd_err)
+                        )
                         callback(nil, pwd_err)
                         return
                     end
 
+                    logger.log(logger.LogLevel.INFO, "jobs.get_git_root_path", "found root path: " .. vim.inspect(pwd))
                     callback(pwd, nil)
                 end)
             end)
         elseif git_ref[1]:find(".+%.git/worktrees/") or git_ref[1]:find(".+%.git/worktrees$") then
             local root_path = git_ref[1]:match("^(.-%.git)/worktrees")
+            logger.log(logger.LogLevel.INFO, "jobs.get_git_root_path", "found root path: " .. vim.inspect(root_path))
             callback(root_path, nil)
         elseif git_ref[1] == ".git" then
-            callback(nil, "Must be in a bare repo")
+            local err_message = "Must be in a bare repo"
+            logger.log(logger.LogLevel.ERROR, "jobs.get_git_root_path", err_message)
+            callback(nil, err_message)
         else
-            callback(nil, "Failed to get git root path")
+            local err_message = "Failed to get git root path"
+            logger.log(logger.LogLevel.ERROR, "jobs.get_git_root_path", err_message)
+            callback(nil, err_message)
         end
     end)
 end

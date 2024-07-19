@@ -8,12 +8,12 @@ describe("jobs", function()
     describe("get_git_root_path", function()
         local original_get_git_worktree_reference = jobs._get_git_worktree_reference
         local original_is_in_bare_repo = jobs._in_bare_repo
-        local original_git_pwd = jobs._git_pwd
+        local original_get_pwd = jobs._get_pwd
 
         after_each(function()
             jobs._get_git_worktree_reference = original_get_git_worktree_reference
             jobs._in_bare_repo = original_is_in_bare_repo
-            jobs._git_pwd = original_git_pwd
+            jobs._get_pwd = original_get_pwd
         end)
 
         async.tests.it("should return the git root path when inside a worktree", function()
@@ -70,7 +70,7 @@ describe("jobs", function()
                 jobs._in_bare_repo = vim.schedule_wrap(function(callback)
                     callback({ "true" }, nil)
                 end)
-                jobs._git_pwd = vim.schedule_wrap(function(callback)
+                jobs._get_pwd = vim.schedule_wrap(function(callback)
                     callback({ "the/path/returned/by/pwd.git" }, nil)
                 end)
 
@@ -86,7 +86,7 @@ describe("jobs", function()
                 jobs._in_bare_repo = vim.schedule_wrap(function(callback)
                     callback({ "true" }, nil)
                 end)
-                jobs._git_pwd = vim.schedule_wrap(function(callback)
+                jobs._get_pwd = vim.schedule_wrap(function(callback)
                     callback(nil, "Some pwd error")
                 end)
 
