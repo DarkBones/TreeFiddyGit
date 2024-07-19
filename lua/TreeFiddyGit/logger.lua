@@ -7,7 +7,9 @@ M.LogLevel = {
     DEBUG = "DEBUG",
 }
 
-local log_level = nil -- Change this to set the log level
+-- TODO: Make these configurable
+local log_level = "DEBUG" -- Change this to set the log level
+local log_file = vim.fn.stdpath("config") .. "/TreeFiddyGit.log"
 
 local log_level_order = {
     DEBUG = 1,
@@ -29,7 +31,15 @@ function M.log(level, initiator, msg)
     if type(msg) == "table" then
         msg = vim.inspect(msg)
     end
-    print(date .. " -- " .. level .. " -- " .. initiator .. " -- " .. msg)
+    local log_msg = date .. " -- " .. level .. " -- " .. initiator .. " -- " .. msg .. "\n"
+
+    local file = io.open(log_file, "a")
+    if file == nil then
+        return
+    end
+
+    file:write(log_msg)
+    file:close()
 end
 
 return M
