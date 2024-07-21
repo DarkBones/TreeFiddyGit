@@ -1,0 +1,29 @@
+name: Run Tests
+
+on:
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v2
+
+    - name: Set up Neovim
+      uses: ricksoab/nvim-treesitter-action@v1
+      with:
+        neovim-version: stable
+
+    - name: Install dependencies
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y luarocks
+        luarocks install plenary
+        luarocks install busted
+
+    - name: Run tests
+      run: |
+        bash run_tests.sh
