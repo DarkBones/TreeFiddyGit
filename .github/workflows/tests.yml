@@ -30,11 +30,13 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y luarocks lua5.1
-          luarocks --lua-version=5.1 install plenary
-          luarocks --lua-version=5.1 install busted
+          luarocks --local install plenary
+          luarocks --local install busted
 
       - name: Run tests
         env:
           PATH: ${{ runner.home }}/.luarocks/bin:$PATH
+          LUA_PATH: "${{ runner.home }}/.luarocks/share/lua/5.1/?.lua;${{ runner.home }}/.luarocks/share/lua/5.1/?/init.lua;;"
+          LUA_CPATH: "${{ runner.home }}/.luarocks/lib/lua/5.1/?.so;;"
         run: |
           bash run_tests.sh
