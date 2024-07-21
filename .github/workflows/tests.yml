@@ -31,16 +31,15 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y lua5.1 luarocks
 
-      - name: Configure Luarocks and Install Dependencies
+      - name: Install Dependencies Locally
         run: |
-          luarocks --local config --local tree
-          luarocks --local install plenary
-          luarocks --local install busted
+          luarocks install plenary --tree $HOME/.luarocks
+          luarocks install busted --tree $HOME/.luarocks
 
       - name: Run tests
         env:
-          PATH: ${{ runner.home }}/.luarocks/bin:$PATH
-          LUA_PATH: "${{ runner.home }}/.luarocks/share/lua/5.1/?.lua;${{ runner.home }}/.luarocks/share/lua/5.1/?/init.lua;;"
-          LUA_CPATH: "${{ runner.home }}/.luarocks/lib/lua/5.1/?.so;;"
+          PATH: $HOME/.luarocks/bin:$PATH
+          LUA_PATH: "$HOME/.luarocks/share/lua/5.1/?.lua;$HOME/.luarocks/share/lua/5.1/?/init.lua;;"
+          LUA_CPATH: "$HOME/.luarocks/lib/lua/5.1/?.so;;"
         run: |
           bash run_tests.sh
