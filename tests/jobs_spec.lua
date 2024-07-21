@@ -5,6 +5,7 @@ local assert = require("luassert")
 
 describe("jobs", function()
     local jobs = require("TreeFiddyGit.jobs")
+
     describe("get_git_root_path", function()
         local original_get_git_worktree_reference = jobs._get_git_worktree_reference
         local original_is_in_bare_repo = jobs._in_bare_repo
@@ -174,6 +175,90 @@ describe("jobs", function()
             local result, err = async.wrap(jobs.get_git_root_path, 1)()
             assert.is_nil(result)
             assert.are.equal("Failed to get git root path", err)
+        end)
+    end)
+
+    describe("_git_branch_exists_locally", function()
+        local original_run_job = jobs._run_job
+
+        after_each(function()
+            jobs._run_job = original_run_job
+        end)
+
+        async.tests.it("should return true if the branch exists", function()
+            jobs._run_job = vim.schedule_wrap(function(_, _, callback)
+                callback({ "+ branch" }, nil)
+            end)
+
+            local result, err = async.wrap(jobs._git_branch_exists_locally, 2)("branch")
+            assert.is_nil(err)
+            assert.is_true(result)
+        end)
+
+        async.tests.it("should return false if the branch does not exist", function()
+            jobs._run_job = vim.schedule_wrap(function(_, _, callback)
+                callback({}, nil)
+            end)
+
+            local result, err = async.wrap(jobs._git_branch_exists_locally, 2)("branch")
+            assert.is_nil(err)
+            assert.is_false(result)
+        end)
+
+        async.tests.it("should error if branch is already checked out", function()
+            jobs._run_job = vim.schedule_wrap(function(_, _, callback)
+                callback({ "* branch" }, nil)
+            end)
+
+            local result, err = async.wrap(jobs._git_branch_exists_locally, 2)("branch")
+            assert.is_nil(result)
+            assert.are.equal("Branch is already checked out", err)
+        end)
+    end)
+
+    describe("branch_exists", function()
+        local original_exists_locally = jobs._git_branch_exists_locally
+        local original_exists_remote = jobs._git_branch_exists_remotely
+
+        after_each(function()
+            jobs._git_branch_exists_locally = original_exists_locally
+            jobs._git_branch_exists_remotely = original_exists_remote
+        end)
+
+        async.tests.it("should return 'local' if the branch exists locally", function()
+            jobs._git_branch_exists_locally = vim.schedule_wrap(function(_, callback)
+                callback(true, nil)
+            end)
+
+            local result, err = async.wrap(jobs.git_branch_exists, 2)("branch")
+            assert.is_nil(err)
+            assert.are.equal("local", result)
+        end)
+
+        async.tests.it("should return 'remote' if the branch exists remotely", function()
+            jobs._git_branch_exists_locally = vim.schedule_wrap(function(_, callback)
+                callback(false, nil)
+            end)
+            jobs._git_branch_exists_remotely = vim.schedule_wrap(function(_, callback)
+                callback(true, nil)
+            end)
+
+            local result, err = async.wrap(jobs.git_branch_exists, 2)("branch")
+            assert.is_nil(err)
+            assert.are.equal("remote", result)
+        end)
+
+        async.tests.it("should return 'none' if the branch does not exist", function()
+            jobs._git_branch_exists_locally = vim.schedule_wrap(function(_, callback)
+                callback(false, nil)
+            end)
+            jobs._git_branch_exists_remotely = vim.schedule_wrap(function(_, callback)
+                callback(false, nil)
+            end)
+
+            local result, err = async.wrap(jobs.git_branch_exists, 2)("branch")
+            assert.is_nil(err)
+            assert.are.equal("none", result)
         end)
     end)
 end)

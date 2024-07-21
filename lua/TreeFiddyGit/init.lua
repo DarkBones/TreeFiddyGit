@@ -11,6 +11,7 @@ M.default_config = {
     branch_parser = nil,
     path_parser = nil,
     auto_move_to_new_worktree = true,
+    remote_name = "origin",
     logging = {
         level = nil,
         file = vim.fn.stdpath("config") .. "/TreeFiddyGit.log",
@@ -355,6 +356,35 @@ function M.create_new_worktree_with_stash(branch_name, path)
                 end)
             end
         end)
+    end)
+end
+
+function M.checkout_branch()
+    local branch_name = vim.fn.input("Enter the branch name: ")
+
+    if branch_name == "" then
+        return
+    end
+
+    jobs.current_branch_and_path(function(current, err_current)
+        if err_current then
+            M._handle_errors(err_current)
+            return
+        end
+
+        local current_branch, current_path = current[1], current[2]
+        if not M._current_is_valid(current_branch, current_path) then
+            return
+        end
+
+        local hook_data = {
+            branch_name = branch_name,
+            current_branch = current_branch,
+            current_path = current_path,
+        }
+        utils.run_hook("pre_checkout_branch", hook_data)
+
+        jobs.git_branch_exists(branch_name, function() end)
     end)
 end
 

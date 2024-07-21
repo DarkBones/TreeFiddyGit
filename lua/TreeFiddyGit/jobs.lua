@@ -115,6 +115,54 @@ function M._branch_has_changes(callback)
     end)
 end
 
+function M._git_branch_exists_locally(branch, callback)
+    M._run_job("git", { "branch", "--list", "-a", branch }, function(res, err)
+        if err ~= nil then
+            logger.log(logger.LogLevel.ERROR, "jobs._git_branch_exists_locally", err)
+            callback(nil, err)
+            return
+        end
+
+        if next(res) == nil then
+            logger.log(logger.LogLevel.INFO, "jobs._git_branch_exists_locally", "Branch does not exist")
+            callback(false, nil)
+            return
+        end
+
+        -- if res[1] starts with "*" then it is already checked out
+        if res[1]:find("^%*") then
+            callback(nil, "Branch is already checked out")
+            return
+        end
+
+        logger.log(logger.LogLevel.INFO, "jobs._git_branch_exists_locally", "Branch exists")
+        callback(true, nil)
+    end)
+end
+
+function M._git_branch_exists_remotely(branch, callback)
+    M._run_job(
+        "bash",
+        { "-c", "git ls-remote --heads " .. require("TreeFiddyGit").config.remote_name .. " " .. branch },
+        function(res, err)
+            if err then
+                logger.log(logger.LogLevel.ERROR, "jobs._git_branch_exists_remotely", err)
+                callback(nil, err)
+                return
+            end
+
+            if next(res) == nil then
+                logger.log(logger.LogLevel.INFO, "jobs._git_branch_exists_remotely", "Branch does not exist")
+                callback(false, nil)
+                return
+            end
+
+            logger.log(logger.LogLevel.INFO, "jobs._git_branch_exists_remotely", "Branch exists")
+            callback(true, nil)
+        end
+    )
+end
+
 function M.get_worktrees(callback)
     M._run_job("git", { "worktree", "list" }, function(res, err)
         if err ~= nil then
@@ -309,6 +357,55 @@ function M.pop_stash(callback)
         end
 
         callback(true, nil)
+    end)
+end
+
+function M.git_branch_exists(branch, callback)
+    M._git_branch_exists_locally(branch, function(exists_local, err)
+        if err then
+            if err == "Branch is already checked out" then
+                vim.schedule(function()
+                    vim.notify("Branch is already checked out", vim.log.levels.INFO)
+                end)
+                return
+            end
+
+            logger.log(logger.LogLevel.ERROR, "jobs.git_branch_exists", err)
+            callback(nil, err)
+        end
+
+        if exists_local then
+            local msg = "Branch exists locally"
+            logger.log(logger.LogLevel.INFO, "jobs.git_branch_exists", msg)
+
+            callback("local", nil)
+            return
+        end
+
+        local msg = "Branch does not exist locally, checking remote..."
+        logger.log(logger.LogLevel.INFO, "jobs.git_branch_exists", msg)
+        vim.schedule(function()
+            vim.notify(msg, vim.log.levels.INFO)
+        end)
+
+        M._git_branch_exists_remotely(branch, function(exists_remote, err_remote)
+            if err_remote then
+                logger.log(logger.LogLevel.ERROR, "jobs.git_branch_exists", err_remote)
+                callback(nil, err_remote)
+                return
+            end
+
+            if not exists_remote then
+                local no_branch_msg = "Branch does not exist"
+                logger.log(logger.LogLevel.WARN, "jobs.git_branch_exists", no_branch_msg)
+                vim.notify(no_branch_msg, vim.log.levels.WARN)
+                callback("none", nil)
+                return
+            end
+
+            logger.log(logger.LogLevel.INFO, "jobs.git_branch_exists", "Branch exists remotely")
+            callback("remote", nil)
+        end)
     end)
 end
 
