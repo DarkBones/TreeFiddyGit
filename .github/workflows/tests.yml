@@ -2,37 +2,39 @@ name: Run Tests
 
 on:
   pull_request:
-    branches: [ main ]
+    branches: [main]
 
 jobs:
   test:
     runs-on: ubuntu-latest
 
     steps:
-    - name: Checkout repository
-      uses: actions/checkout@v2
+      - name: Checkout repository
+        uses: actions/checkout@v2
 
-    - name: Set up Neovim
-      run: |
-        mkdir -p ~/.local/share/nvim/site/pack/vendor/start
-        git clone --depth 1 https://github.com/nvim-lua/plenary.nvim ~/.local/share/nvim/site/pack/vendor/start/plenary.nvim
-        ln -s $(pwd) ~/.local/share/nvim/site/pack/vendor/start
+      - name: Set up Neovim
+        run: |
+          mkdir -p ~/.local/share/nvim/site/pack/vendor/start
+          git clone --depth 1 https://github.com/nvim-lua/plenary.nvim ~/.local/share/nvim/site/pack/vendor/start/plenary.nvim
+          ln -s $(pwd) ~/.local/share/nvim/site/pack/vendor/start
 
-    - name: Install Neovim
-      run: |
-        curl -LO https://github.com/neovim/neovim/releases/download/nightly/nvim.appimage
-        chmod u+x nvim.appimage
-        ./nvim.appimage --appimage-extract
-        sudo mv squashfs-root /opt/nvim
-        sudo ln -s /opt/nvim/AppRun /usr/bin/nvim
+      - name: Install Neovim
+        run: |
+          curl -LO https://github.com/neovim/neovim/releases/download/nightly/nvim.appimage
+          chmod u+x nvim.appimage
+          ./nvim.appimage --appimage-extract
+          sudo mv squashfs-root /opt/nvim
+          sudo ln -s /opt/nvim/AppRun /usr/bin/nvim
 
-    - name: Install dependencies
-      run: |
-        sudo apt-get update
-        sudo apt-get install -y luarocks
-        luarocks install plenary
-        luarocks install busted
+      - name: Install luarocks locally
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y luarocks
+          luarocks install --local plenary
+          luarocks install --local busted
 
-    - name: Run tests
-      run: |
-        bash run_tests.sh
+      - name: Run tests
+        env:
+          PATH: ${{ runner.home }}/.luarocks/bin:$PATH
+        run: |
+          bash run_tests.sh
