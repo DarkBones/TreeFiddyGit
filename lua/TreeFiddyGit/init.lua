@@ -74,7 +74,7 @@ function M._update_buffers(git_path, abs_path)
     end
 end
 
-function M._perform_move(abs_path, hook_data, callback)
+function M._perform_move(abs_path, hook_data, callback, hook_path)
     logger.log(
         logger.LogLevel.DEBUG,
         "TreeFiddyGit._perform_move",
@@ -93,7 +93,7 @@ function M._perform_move(abs_path, hook_data, callback)
             end)
         end
 
-        utils.run_hook("post_move_to_worktree", hook_data)
+        utils.run_hook(utils.merge_hook_path(hook_path, "post_move_to_worktree"), hook_data)
         if callback then
             callback(true, nil)
         end
@@ -111,7 +111,7 @@ function M._current_is_valid(current_branch, current_path)
     return true
 end
 
-function M.move_to_worktree(branch_name, path, callback)
+function M.move_to_worktree(branch_name, path, callback, hook_path)
     logger.log(
         logger.LogLevel.DEBUG,
         "TreeFiddyGit.move_to_worktree",
@@ -151,18 +151,18 @@ function M.move_to_worktree(branch_name, path, callback)
                 current_path = current_path,
                 abs_worktree_path = abs_path,
             }
-            utils.run_hook("pre_move_to_worktree", hook_data)
+            utils.run_hook(utils.merge_hook_path(hook_path, "pre_move_to_worktree"), hook_data)
 
             M._perform_move(abs_path, hook_data, function()
                 if callback then
                     callback(nil, err_current)
                 end
-            end)
+            end, hook_path)
         end)
     end)
 end
 
-function M.delete_worktree(branch_name, path)
+function M.delete_worktree(branch_name, path, hook_path)
     logger.log(
         logger.LogLevel.DEBUG,
         "TreeFiddyGit.delete_worktree",
@@ -193,7 +193,7 @@ function M.delete_worktree(branch_name, path)
                 current_path = current_path,
                 abs_worktree_path = abs_path,
             }
-            utils.run_hook("pre_delete_worktree", hook_data)
+            utils.run_hook(utils.merge_hook_path(hook_path, "pre_delete_worktree"), hook_data)
 
             jobs.delete_worktree(path, function(delete_result, delete_err)
                 if delete_err then
@@ -206,7 +206,7 @@ function M.delete_worktree(branch_name, path)
                     vim.schedule(function()
                         vim.notify("Deleted worktree: " .. path, vim.log.levels.INFO)
                     end)
-                    utils.run_hook("post_delete_worktree", hook_data)
+                    utils.run_hook(utils.merge_hook_path(hook_path, "post_delete_worktree"), hook_data)
                 else
                     logger.log(
                         logger.LogLevel.INFO,
@@ -222,7 +222,7 @@ function M.delete_worktree(branch_name, path)
     end)
 end
 
-function M.create_worktree(branch_name, path, callback)
+function M.create_worktree(branch_name, path, callback, hook_path)
     logger.log(
         logger.LogLevel.DEBUG,
         "TreeFiddyGit.create_worktree",
@@ -262,7 +262,7 @@ function M.create_worktree(branch_name, path, callback)
                 current_path = current_path,
                 abs_worktree_path = wt_path,
             }
-            utils.run_hook("pre_create_worktree", hook_data)
+            utils.run_hook(utils.merge_hook_path(hook_path, "pre_create_worktree"), hook_data)
 
             local branch_and_path = {
                 branch_name = branch_name,
@@ -281,14 +281,14 @@ function M.create_worktree(branch_name, path, callback)
                 vim.schedule(function()
                     vim.notify("Created worktree: " .. wt_path, vim.log.levels.INFO)
                 end)
-                utils.run_hook("post_create_worktree", hook_data)
+                utils.run_hook(utils.merge_hook_path(hook_path, "post_create_worktree"), hook_data)
                 callback(true, nil)
             end)
         end)
     end)
 end
 
-function M.create_new_worktree(branch_name, path, callback)
+function M.create_new_worktree(branch_name, path, callback, hook_path)
     jobs.create_git_branch(branch_name, function(_, create_err)
         if create_err then
             M._handle_errors(create_err)
@@ -308,6 +308,7 @@ function M.create_new_worktree(branch_name, path, callback)
             end
 
             if M.config.auto_move_to_new_worktree or callback then
+                local hook_path_new = utils.merge_hook_path(hook_path, "create")
                 M.move_to_worktree(branch_name, path, function(_, err_move)
                     if err_move then
                         M._handle_errors(err_move)
@@ -320,17 +321,18 @@ function M.create_new_worktree(branch_name, path, callback)
                     if callback then
                         callback(true, nil)
                     end
-                end)
+                end, hook_path_new)
             else
                 if callback then
                     callback(true, nil)
                 end
             end
-        end)
+        end, hook_path)
     end)
 end
 
-function M.create_new_worktree_with_stash(branch_name, path)
+function M.create_new_worktree_with_stash(branch_name, path, hook_path)
+    local hook_path_new = utils.merge_hook_path(hook_path, "create_with_stash")
     jobs.stash(function(has_stashed, stashed_err)
         if stashed_err then
             M._handle_errors(stashed_err)
@@ -355,11 +357,14 @@ function M.create_new_worktree_with_stash(branch_name, path)
                     end)
                 end)
             end
-        end)
+        end, hook_path_new)
     end)
 end
 
-function M._post_checkout_create_worktree(branch_name, path)
+function M._post_checkout_create_worktree(branch_name, path, exists, hook_data, hook_path)
+    hook_data = utils.deep_merge(hook_data, { branch_location = exists })
+    local hook_path_new = utils.merge_hook_path(hook_path, "checkout")
+    utils.run_hook(utils.merge_hook_path(hook_path_new, "post_checkout_branch"), hook_data)
     M.create_worktree(branch_name, path, function(_, err_create)
         if err_create then
             M._handle_errors(err_create)
@@ -371,11 +376,11 @@ function M._post_checkout_create_worktree(branch_name, path)
                 M._handle_errors(err_move)
                 return
             end
-        end)
-    end)
+        end, hook_path_new)
+    end, hook_path_new)
 end
 
-function M.checkout_branch()
+function M.checkout_branch(hook_path)
     local branch_name = vim.fn.input("Enter the branch name: ")
 
     if branch_name == "" then
@@ -398,7 +403,7 @@ function M.checkout_branch()
             current_branch = current_branch,
             current_path = current_path,
         }
-        utils.run_hook("pre_checkout_branch", hook_data)
+        utils.run_hook(utils.merge_hook_path(hook_path, "pre_checkout_branch"), hook_data)
 
         jobs.git_branch_exists(branch_name, function(res_exists, err_exists)
             if err_exists then
@@ -428,10 +433,10 @@ function M.checkout_branch()
                             end
                         end
 
-                        M._post_checkout_create_worktree(branch_name, path)
+                        M._post_checkout_create_worktree(branch_name, path, res_exists, hook_data, hook_path)
                     end)
                 else
-                    M._post_checkout_create_worktree(branch_name, path)
+                    M._post_checkout_create_worktree(branch_name, path, res_exists, hook_data, hook_path)
                 end
             end)
         end)

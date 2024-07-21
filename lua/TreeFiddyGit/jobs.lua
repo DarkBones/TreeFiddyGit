@@ -22,7 +22,7 @@ function M._run_job(command, args, callback)
                     .. "`"
                     .. err_message
 
-                logger.log(logger.LogLevel.ERROR, "jobs._run_job", err_message)
+                logger.log(logger.LogLevel.ERROR, "jobs._run_job", vim.inspect(err_message))
 
                 callback(nil, full_err_msg)
 
@@ -165,8 +165,8 @@ end
 
 function M.get_worktrees(callback)
     M._run_job("git", { "worktree", "list" }, function(res, err)
-        if err ~= nil then
-            logger.log(logger.LogLevel.ERROR, "jobs.get_worktrees", err)
+        if err then
+            logger.log(logger.LogLevel.ERROR, "jobs.get_worktrees", vim.inspect(err))
             callback(nil, err)
             return
         end

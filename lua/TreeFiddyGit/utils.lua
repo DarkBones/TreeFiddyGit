@@ -97,6 +97,10 @@ function M.deep_merge(base_table, new_table)
     return base_table
 end
 
+function M.merge_hook_path(path, hook)
+    return path and (path .. "." .. hook) or hook
+end
+
 function M.run_hook(action, data)
     logger.log(logger.LogLevel.DEBUG, "utils.run_hook", "called with: " .. vim.inspect({ action, data }))
 
@@ -111,7 +115,11 @@ function M.run_hook(action, data)
         logger.log(logger.LogLevel.INFO, "utils.run_hook", "Hook is a string, so running as a command")
         os.execute(hook)
     elseif type(hook) == "function" then
-        logger.log(logger.LogLevel.INFO, "utils.run_hook", "Hook is a function, so running it")
+        logger.log(
+            logger.LogLevel.INFO,
+            "utils.run_hook",
+            "Hook is a function, so running it with path '" .. vim.inspect(hook_path) .. "'"
+        )
         hook(action, data)
     end
 end
@@ -124,12 +132,20 @@ function M.update_worktree_buffer_path(old_git_path, new_git_path, buf_path)
     )
 
     if buf_path:sub(1, #old_git_path) ~= old_git_path then
-        logger.log(logger.LogLevel.ERROR, "utils.update_worktree_buffer_path", "Buffer path does not start with old git path")
+        logger.log(
+            logger.LogLevel.ERROR,
+            "utils.update_worktree_buffer_path",
+            "Buffer path does not start with old git path"
+        )
         return buf_path
     end
 
     local buf_relative_path = buf_path:sub(#old_git_path + 1)
-    logger.log(logger.LogLevel.INFO, "utils.update_worktree_buffer_path", "Returning: " .. new_git_path .. buf_relative_path)
+    logger.log(
+        logger.LogLevel.INFO,
+        "utils.update_worktree_buffer_path",
+        "Returning: " .. new_git_path .. buf_relative_path
+    )
 
     return new_git_path .. buf_relative_path
 end

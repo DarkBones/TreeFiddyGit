@@ -51,9 +51,7 @@ function M.log(level, initiator, msg)
     end
 
     local date = os.date("%Y-%m-%dT%H:%M:%S")
-    if type(msg) == "table" then
-        msg = vim.inspect(msg)
-    end
+    msg = vim.inspect(msg)
     local log_msg = date .. " -- " .. level .. " -- " .. initiator .. " -- " .. msg .. "\n"
 
     local file = io.open(config.file, "a")
