@@ -23,7 +23,7 @@ describe("jobs", function()
             end)
 
             local result, err = async.wrap(jobs.get_git_root_path, 1)()
-            assert.are.equal("/home/user/gitrepo.git-fail", result)
+            assert.are.equal("/home/user/gitrepo.git", result)
             assert.is_nil(err)
         end)
 
