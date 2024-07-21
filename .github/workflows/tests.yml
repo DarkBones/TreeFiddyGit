@@ -20,25 +20,23 @@ jobs:
 
       - name: Install Neovim
         run: |
-          curl -LO https://github.com/neovim/neovim/releases/download/nightly/nvim.appimage
-          chmod u+x nvim.appimage
-          ./nvim.appimage --appimage-extract
-          sudo mv squashfs-root /opt/nvim
-          sudo ln -s /opt/nvim/AppRun /usr/local/bin/nvim
+          sudo apt-get update
+          sudo apt-get install -y neovim
 
       - name: Install Lua and Luarocks
         run: |
-          sudo apt-get update
           sudo apt-get install -y lua5.1 luarocks
 
       - name: Check Lua Version
         run: lua -v
 
+      - name: Check Neovim Version
+        run: nvim --version
+
       - name: Run tests
         env:
-          PATH: /usr/local/bin:$HOME/.luarocks/bin:$PATH
+          PATH: $HOME/.luarocks/bin:$PATH
           LUA_PATH: "$HOME/.luarocks/share/lua/5.1/?.lua;$HOME/.luarocks/share/lua/5.1/?/init.lua;$HOME/.local/share/nvim/site/pack/vendor/start/plenary.nvim/?.lua;;"
           LUA_CPATH: "$HOME/.luarocks/lib/lua/5.1/?.so;;"
         run: |
-          nvim --version
           ./run_tests.sh
