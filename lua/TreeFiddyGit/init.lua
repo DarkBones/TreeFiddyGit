@@ -1,351 +1,443 @@
-local Job = require("plenary.job")
-local worktree_parser = require("TreeFiddyGit.parsers.worktrees_parser")
+local jobs = require("TreeFiddyGit.jobs")
+local parsers = require("TreeFiddyGit.parsers")
 local utils = require("TreeFiddyGit.utils")
+local logger = require("TreeFiddyGit.logger")
 
 local M = {}
 
-M.config = {
+M.default_config = {
     change_directory_cmd = "cd",
     hook = nil,
+    branch_parser = nil,
+    path_parser = nil,
+    auto_move_to_new_worktree = true,
+    remote_name = "origin",
+    logging = {
+        level = nil,
+        file = vim.fn.stdpath("config") .. "/TreeFiddyGit.log",
+        max_size = 1024 * 1024 * 5, -- 5mb
+        rolling_file = false,
+    },
 }
 
-M.setup = function(opts)
+M.config = {}
+
+function M.setup(opts)
     opts = opts or {}
-    local options = M.config
-
-    options = utils.merge_tables(options, opts)
-
-    M.config = options
-    require("telescope").load_extension("tree_fiddy_git")
+    M.config = utils.deep_merge(vim.deepcopy(M.default_config), opts)
+    logger.log(logger.LogLevel.DEBUG, "TreeFiddyGit.setup", "Loaded with config: " .. vim.inspect(M.config))
 end
 
-M.checkout_branch = function(hook_path)
-    -- Prompt the user for the branch name
+function M.get_worktrees(callback)
+    jobs.get_worktrees(function(worktrees, err_worktrees)
+        if err_worktrees then
+            logger.log(
+                logger.LogLevel.ERROR,
+                "TreeFiddyGit.get_worktrees",
+                "Failed with: " .. vim.inspect(err_worktrees)
+            )
+            vim.schedule(function()
+                vim.api.nvim_err_writeln(err_worktrees)
+            end)
+            return
+        end
+
+        parsers.parse_worktrees(worktrees, function(parsed_worktrees)
+            callback(parsed_worktrees)
+        end)
+    end)
+end
+
+function M._handle_errors(err)
+    vim.schedule(function()
+        vim.api.nvim_err_writeln(err)
+    end)
+end
+
+function M._update_buffers(git_path, abs_path)
+    for _, win in ipairs(vim.api.nvim_list_wins()) do
+        local buf = vim.api.nvim_win_get_buf(win)
+        local buf_path = vim.api.nvim_buf_get_name(buf)
+        local new_buf_path = utils.update_worktree_buffer_path(git_path[1], abs_path, buf_path)
+
+        logger.log(
+            logger.LogLevel.DEBUG,
+            "TreeFiddyGit.move_to_worktree",
+            { buf_path = buf_path, new_buf_path = new_buf_path }
+        )
+
+        if new_buf_path ~= buf_path then
+            vim.api.nvim_buf_set_name(buf, new_buf_path)
+            vim.api.nvim_set_current_win(win)
+            vim.api.nvim_command("edit")
+        end
+    end
+end
+
+function M._perform_move(abs_path, hook_data, callback, hook_path)
+    logger.log(
+        logger.LogLevel.DEBUG,
+        "TreeFiddyGit._perform_move",
+        "called with: " .. vim.inspect({ abs_path, hook_data })
+    )
+
+    vim.schedule(function()
+        vim.cmd(M.config.change_directory_cmd .. " " .. abs_path)
+    end)
+
+    jobs.git_path(function(git_path)
+        if git_path then
+            vim.schedule(function()
+                M._update_buffers(git_path, abs_path)
+                logger.log(logger.LogLevel.INFO, "TreeFiddyGit.move_to_worktree", "Moved to worktree: " .. abs_path)
+            end)
+        end
+
+        utils.run_hook(utils.merge_hook_path(hook_path, "post-move"), hook_data)
+        if callback then
+            callback(true, nil)
+        end
+    end)
+end
+
+function M._current_is_valid(current_branch, current_path)
+    if not current_path or not current_branch then
+        local err_msg = current_path and "Failed to get current branch" or "Failed to get current path"
+        logger.log(logger.LogLevel.ERROR, "TreeFiddyGit.move_to_worktree", err_msg)
+        M._handle_errors(err_msg)
+        return false
+    end
+
+    return true
+end
+
+function M.move_to_worktree(branch_name, path, callback, hook_path)
+    logger.log(
+        logger.LogLevel.DEBUG,
+        "TreeFiddyGit.move_to_worktree",
+        "Called with: " .. vim.inspect({ branch_name, path })
+    )
+
+    jobs.current_branch_and_path(function(current, err_current)
+        if err_current then
+            M._handle_errors(err_current)
+            if callback then
+                callback(nil, err_current)
+            end
+            return
+        end
+
+        local current_branch, current_path = current[1], current[2]
+        if not M._current_is_valid(current_branch, current_path) then
+            if callback then
+                callback(nil, err_current)
+            end
+            return
+        end
+
+        utils.get_absolute_wt_path(path, function(abs_path, err_abs_path)
+            if err_abs_path then
+                M._handle_errors(err_abs_path)
+                if callback then
+                    callback(nil, err_current)
+                end
+                return
+            end
+
+            local hook_data = {
+                branch_name = branch_name,
+                path = path,
+                current_branch = current_branch,
+                current_path = current_path,
+                abs_worktree_path = abs_path,
+            }
+            utils.run_hook(utils.merge_hook_path(hook_path, "pre-move"), hook_data)
+
+            M._perform_move(abs_path, hook_data, function()
+                if callback then
+                    callback(nil, err_current)
+                end
+            end, hook_path)
+        end)
+    end)
+end
+
+function M.delete_worktree(branch_name, path, hook_path)
+    logger.log(
+        logger.LogLevel.DEBUG,
+        "TreeFiddyGit.delete_worktree",
+        "Called with: " .. vim.inspect({ branch_name, path })
+    )
+
+    jobs.current_branch_and_path(function(current, err_current)
+        if err_current then
+            M._handle_errors(err_current)
+            return
+        end
+
+        local current_branch, current_path = current[1], current[2]
+        if not M._current_is_valid(current_branch, current_path) then
+            return
+        end
+
+        utils.get_absolute_wt_path(path, function(abs_path, err_abs_path)
+            if err_abs_path then
+                M._handle_errors(err_abs_path)
+                return
+            end
+
+            local hook_data = {
+                branch_name = branch_name,
+                path = path,
+                current_branch = current_branch,
+                current_path = current_path,
+                abs_worktree_path = abs_path,
+            }
+            utils.run_hook(utils.merge_hook_path(hook_path, "pre-delete"), hook_data)
+
+            jobs.delete_worktree(path, function(delete_result, delete_err)
+                if delete_err then
+                    M._handle_errors(delete_err)
+                    return
+                end
+
+                if delete_result then
+                    logger.log(logger.LogLevel.INFO, "TreeFiddyGit.delete_worktree", "Deleted worktree: " .. path)
+                    vim.schedule(function()
+                        vim.notify("Deleted worktree: " .. path, vim.log.levels.INFO)
+                    end)
+                    utils.run_hook(utils.merge_hook_path(hook_path, "post-delete"), hook_data)
+                else
+                    logger.log(
+                        logger.LogLevel.INFO,
+                        "TreeFiddyGit.delete_worktree",
+                        "Did not delete worktree: " .. path
+                    )
+                    vim.schedule(function()
+                        vim.notify("Did not delete worktree: " .. path, vim.log.levels.INFO)
+                    end)
+                end
+            end)
+        end)
+    end)
+end
+
+function M.create_worktree(branch_name, path, callback, hook_path)
+    logger.log(
+        logger.LogLevel.DEBUG,
+        "TreeFiddyGit.create_worktree",
+        "Called with: " .. vim.inspect({ branch_name, path })
+    )
+
+    utils.get_absolute_wt_path(path, function(wt_path, wt_path_err)
+        if wt_path_err then
+            M._handle_errors(wt_path_err)
+            if callback then
+                callback(nil, wt_path_err)
+            end
+            return
+        end
+
+        jobs.current_branch_and_path(function(current, err_current)
+            if err_current then
+                M._handle_errors(err_current)
+                if callback then
+                    callback(nil, err_current)
+                end
+                return
+            end
+
+            local current_branch, current_path = current[1], current[2]
+            if not M._current_is_valid(current_branch, current_path) then
+                if callback then
+                    callback(nil, "invalid current branch or path")
+                end
+                return
+            end
+
+            local hook_data = {
+                branch_name = branch_name,
+                path = path,
+                current_branch = current_branch,
+                current_path = current_path,
+                abs_worktree_path = wt_path,
+            }
+            utils.run_hook(utils.merge_hook_path(hook_path, "pre-create"), hook_data)
+
+            local branch_and_path = {
+                branch_name = branch_name,
+                path = wt_path,
+            }
+            jobs.create_worktree(branch_and_path, function(_, create_err)
+                if create_err then
+                    M._handle_errors(create_err)
+                    if callback then
+                        callback(nil, create_err)
+                    end
+                    return
+                end
+
+                logger.log(logger.LogLevel.INFO, "TreeFiddyGit.create_worktree", "Created worktree: " .. wt_path)
+                vim.schedule(function()
+                    vim.notify("Created worktree: " .. wt_path, vim.log.levels.INFO)
+                end)
+                utils.run_hook(utils.merge_hook_path(hook_path, "post-create"), hook_data)
+                callback(true, nil)
+            end)
+        end)
+    end)
+end
+
+function M.create_new_worktree(branch_name, path, callback, hook_path)
+    jobs.create_git_branch(branch_name, function(_, create_err)
+        if create_err then
+            M._handle_errors(create_err)
+            if callback then
+                callback(nil, create_err)
+            end
+            return
+        end
+
+        M.create_worktree(branch_name, path, function(_, create_wt_err)
+            if create_wt_err then
+                M._handle_errors(create_wt_err)
+                if callback then
+                    callback(nil, create_err)
+                end
+                return
+            end
+
+            if M.config.auto_move_to_new_worktree or callback then
+                local hook_path_new = utils.merge_hook_path(hook_path, "create")
+                M.move_to_worktree(branch_name, path, function(_, err_move)
+                    if err_move then
+                        M._handle_errors(err_move)
+                        if callback then
+                            callback(nil, err_move)
+                        end
+                        return
+                    end
+
+                    if callback then
+                        callback(true, nil)
+                    end
+                end, hook_path_new)
+            else
+                if callback then
+                    callback(true, nil)
+                end
+            end
+        end, hook_path)
+    end)
+end
+
+function M.create_new_worktree_with_stash(branch_name, path, hook_path)
+    local hook_path_new = utils.merge_hook_path(hook_path, "create_with_stash")
+    jobs.stash(function(has_stashed, stashed_err)
+        if stashed_err then
+            M._handle_errors(stashed_err)
+            return
+        end
+
+        M.create_new_worktree(branch_name, path, function(_, err_create)
+            if err_create then
+                M._handle_errors(err_create)
+                return
+            end
+
+            if has_stashed then
+                jobs.pop_stash(function(_, pop_err)
+                    if pop_err then
+                        M._handle_errors(pop_err)
+                        return
+                    end
+
+                    vim.schedule(function()
+                        vim.notify("Moved changes to new worktree")
+                    end)
+                end)
+            end
+        end, hook_path_new)
+    end)
+end
+
+function M._post_checkout_create_worktree(branch_name, path, exists, hook_data, hook_path)
+    hook_data = utils.deep_merge(hook_data, { branch_location = exists })
+    local hook_path_new = utils.merge_hook_path(hook_path, "checkout")
+    utils.run_hook(utils.merge_hook_path(hook_path_new, "post-checkout"), hook_data)
+    M.create_worktree(branch_name, path, function(_, err_create)
+        if err_create then
+            M._handle_errors(err_create)
+            return
+        end
+
+        M.move_to_worktree(branch_name, path, function(_, err_move)
+            if err_move then
+                M._handle_errors(err_move)
+                return
+            end
+        end, hook_path_new)
+    end, hook_path_new)
+end
+
+function M.checkout_branch(hook_path)
     local branch_name = vim.fn.input("Enter the branch name: ")
 
     if branch_name == "" then
         return
     end
 
-    utils.current_branch_and_path(function(old_branch_and_path, err_curr_branch)
-        local old_branch, old_path = old_branch_and_path[1], old_branch_and_path[2]
-        if err_curr_branch ~= nil then
-            vim.schedule(function()
-                vim.api.nvim_err_writeln(err_curr_branch)
-            end)
+    jobs.current_branch_and_path(function(current, err_current)
+        if err_current then
+            M._handle_errors(err_current)
             return
         end
 
-        local data_pre_checkout = {
-            new_branch = branch_name,
-            old_branch = old_branch,
-            old_path = old_path,
+        local current_branch, current_path = current[1], current[2]
+        if not M._current_is_valid(current_branch, current_path) then
+            return
+        end
+
+        local hook_data = {
+            branch_name = branch_name,
+            current_branch = current_branch,
+            current_path = current_path,
         }
+        utils.run_hook(utils.merge_hook_path(hook_path, "pre-checkout"), hook_data)
 
-        utils.run_hook(M.config.hook, utils.merge_hook_path(hook_path, "pre-checkout"), data_pre_checkout)
-
-        utils.git_branch_exists(branch_name, function(exists, err)
-            if err ~= nil then
-                vim.schedule(function()
-                    vim.api.nvim_err_writeln(err)
-                end)
-
+        jobs.git_branch_exists(branch_name, function(res_exists, err_exists)
+            if err_exists then
+                M._handle_errors(err_exists)
                 return
             end
 
-            if exists ~= "none" then
-                vim.schedule(function()
-                    local path = vim.fn.input("Enter path to worktree (defaults to branch name): ")
-                    if path == "" then
-                        path = branch_name
-                    end
-
-                    utils.fetch_remote_branch(branch_name, function(_, err_fetch)
-                        if err_fetch ~= nil then
-                            vim.schedule(function()
-                                vim.api.nvim_err_writeln(err_fetch)
-                            end)
-                            return
-                        end
-
-                        local data_post_checkout = {
-                            path = path,
-                        }
-
-                        utils.run_hook(M.config.hook, utils.merge_hook_path(hook_path, "post-checkout"), data_post_checkout)
-
-                        -- create a worktree for the existing branch
-                        local hook_path_new = utils.merge_hook_path(hook_path, "checkout")
-                        M.create_git_worktree(branch_name, path, hook_path_new)
-                    end)
-                end)
-            else
-                print("Branch `" .. branch_name .. "` not found.")
-            end
-        end)
-    end)
-end
-
-M.get_git_worktrees = function(callback)
-    Job:new({
-        command = "git",
-        args = { "worktree", "list" },
-        on_exit = function(j, return_val)
-            if return_val == 0 then
-                local output = j:result()
-                worktree_parser.parse_worktrees(output, function(parsed_output)
-                    callback(parsed_output, nil)
-                end)
-            else
-                callback(nil, "Error running git worktree list")
-            end
-        end,
-    }):start()
-end
-
---- This function creates a new git branch and a new git worktree.
--- It first creates a new git branch with the given branch name without checking it out.
--- Then, it creates a new git worktree with the given path.
--- Finally, it switches to the new worktree.
--- @param branch_name string: The name of the new git branch to be created.
--- @param path string: The path where the new git worktree will be created.
-M.create_new_git_worktree = function(branch_name, path)
-    utils.create_git_branch(branch_name, function(_, err)
-        if err ~= nil then
-            vim.schedule(function()
-                vim.api.nvim_err_writeln(err)
-            end)
-            return
-        end
-
-        M.create_git_worktree(branch_name, path)
-    end)
-end
-
-M.create_new_git_worktree_with_stash = function(branch_name, path)
-    utils.stash(function(has_stashed, err)
-        if err ~= nil then
-            vim.schedule(function()
-                vim.api.nvim_err_writeln(err)
-            end)
-            return
-        end
-
-        utils.create_git_branch(branch_name, function(_, err_create)
-            if err_create ~= nil then
-                vim.schedule(function()
-                    vim.api.nvim_err_writeln(err_create)
-                end)
-                utils.stash_pop()
+            if res_exists == "none" then
+                M._handle_errors("Branch does not exist: " .. branch_name)
                 return
             end
 
-            M.create_git_worktree(branch_name, path, function(_, err_wt)
-                if err_wt ~= nil then
-                    if has_stashed then
-                        utils.stash_pop()
-                    end
-                    return
+            vim.schedule(function()
+                local path = vim.fn.input("Enter path to worktree (defaults to branch name): ")
+                if path == "" then
+                    path = branch_name
                 end
 
-                if has_stashed then
-                    utils.stash_pop(function(_, err_pop)
-                        if err_pop ~= nil then
-                            vim.schedule(function()
-                                vim.api.nvim_err_writeln(err_pop)
-                            end)
-                            return
-                        end
+                hook_data = utils.deep_merge(hook_data, { path = path, branch_location = res_exists })
 
-                        print("successfully moved changes to new worktree")
-                    end)
-                end
-            end, "create-with-stash")
-        end)
-    end)
-end
-
---- This function creates a new git worktree from an existing branch.
--- It first gets the absolute path of the worktree.
--- It creates a new git worktree at the absolute path with the branch name.
--- If the worktree is created successfully, it switches to the worktree.
--- @param branch_name string: The name of the existing git branch.
--- @param path string: The path where the new git worktree will be created.
-M.create_git_worktree = function(branch_name, path, callback, hook_path)
-    utils.get_absolute_wt_path(path, function(wt_path, err)
-        if err ~= nil then
-            vim.schedule(function()
-                vim.api.nvim_err_writeln(err)
-            end)
-            return
-        end
-
-        utils.current_branch_and_path(function(branch_and_path, err_curr_branch)
-            local old_branch, old_path = branch_and_path[1], branch_and_path[2]
-
-            if err_curr_branch ~= nil then
-                vim.schedule(function()
-                    vim.api.nvim_err_writeln(err_curr_branch)
-                end)
-                return
-            end
-
-            local data_pre_create = {
-                new_branch = branch_name,
-                new_path = wt_path,
-                old_branch = old_branch,
-                old_path = old_path,
-                path = path,
-            }
-
-            utils.run_hook(M.config.hook, utils.merge_hook_path(hook_path, "pre-create"), data_pre_create)
-
-            Job:new({
-                command = "git",
-                args = { "worktree", "add", wt_path, branch_name },
-                on_exit = function(_, return_val)
-                    local data_post_create = {
-                        return_val = return_val,
-                    }
-                    data_post_create = utils.merge_tables(data_post_create, data_pre_create)
-
-                    utils.run_hook(M.config.hook, utils.merge_hook_path(hook_path, "post-create"), data_post_create)
-
-                    if return_val == 0 then
-                        local hook_path_new = utils.merge_hook_path(hook_path, "create")
-                        M.move_to_worktree(branch_name, wt_path, hook_path_new, function(_, err_wt)
-                            if err_wt ~= nil then
-                                if callback ~= nil then
-                                    callback(nil, err_wt)
-                                    return
-                                end
-                            end
-
-                            if callback ~= nil then
-                                callback(nil, nil)
-                            end
-                        end)
-                    else
-                        local err_msg = "Error creating git worktree"
-                        if callback then
-                            callback(nil, err_msg)
-                            return
-                        end
-                    end
-                end,
-            }):start()
-        end)
-    end)
-end
-
---- This function is called when a worktree is selected in the Telescope picker.
--- It changes the root directory in Neovim to the selected worktree and updates
--- the paths of all open buffers.
--- If a buffer's file does not exist in the new worktree, assume the user just
--- has a random file open and do nothing.
--- @param path The path of the selected worktree.
-M.move_to_worktree = function(branch_name, path, hook_path, callback)
-    utils.current_branch_and_path(function(old_branch_and_path, err_curr_branch)
-        local old_branch, old_path = old_branch_and_path[1], old_branch_and_path[2]
-
-        if err_curr_branch ~= nil then
-            vim.schedule(function()
-                vim.api.nvim_err_writeln(err_curr_branch)
-            end)
-            return
-        end
-
-        utils.get_absolute_wt_path(path, function(wt_path)
-            local data_pre_move = {
-                new_path = wt_path,
-                new_branch = branch_name,
-                old_branch = old_branch,
-                old_path = old_path,
-                path = path,
-            }
-
-            utils.run_hook(M.config.hook, utils.merge_hook_path(hook_path, "pre-move"), data_pre_move)
-
-            vim.schedule(function()
-                vim.cmd(M.config.change_directory_cmd .. " " .. wt_path)
-            end)
-
-            utils.get_git_path(function(old_git_path)
-                -- Change the paths of all open buffers
-                vim.schedule(function()
-                    local windows = vim.api.nvim_list_wins()
-
-                    for _, win in ipairs(windows) do
-                        local buf = vim.api.nvim_win_get_buf(win)
-                        local buf_path = vim.api.nvim_buf_get_name(buf)
-                        local new_buf_path = utils.update_worktree_buffer_path(old_git_path, wt_path, buf_path)
-
-                        if new_buf_path then
-                            vim.api.nvim_buf_set_name(buf, new_buf_path)
-                            vim.api.nvim_set_current_win(win)
-                            vim.api.nvim_command("edit")
-                        end
-                    end
-
-                    local data_post_move = {
-                        previous_path = old_git_path,
-                    }
-                    data_post_move = utils.merge_tables(data_post_move, data_pre_move)
-                    utils.run_hook(M.config.hook, utils.merge_hook_path(hook_path, "post-move"), data_post_move)
-
-                    if callback ~= nil then
-                        callback(nil, nil)
-                    end
-                end)
-            end)
-        end)
-    end)
-end
-
-M.delete_worktree = function(branch_name, path, hook_path)
-    utils.current_branch_and_path(function(cur_branch_and_path, err_current_branch)
-        local current_branch = cur_branch_and_path[1]
-
-        if err_current_branch ~= nil then
-            vim.schedule(function()
-                vim.api.nvim_err_writeln(err_current_branch)
-            end)
-            return
-        end
-
-        utils.get_absolute_wt_path(path, function(wt_path)
-            local data_pre_delete = {
-                current_branch = current_branch,
-                branch = branch_name,
-                path = path,
-                absolute_path = wt_path,
-            }
-            utils.run_hook(M.config.hook, utils.merge_hook_path(hook_path, "pre-delete"), data_pre_delete)
-
-            utils.delete_worktree(wt_path, function(_, err_remove)
-                if err_remove ~= nil then
-                    vim.schedule(function()
-                        local force = vim.fn.input("Failed to remove. Try to force? [y/n]: ")
-                        if string.lower(force) ~= "y" then
-                            return
-                        end
-
-                        utils.force_delete_worktree(wt_path, function(_, err_force)
-                            if err_force ~= nil then
-                                vim.schedule(function()
-                                    vim.api.nvim_err_writeln(err_force)
-                                end)
+                if res_exists == "remote" then
+                    jobs.fetch_remote_branch(branch_name, function(_, fetch_err)
+                        if fetch_err then
+                            if not string.find(fetch_err, "%[new branch%]") then
+                                M._handle_errors(fetch_err)
                                 return
                             end
+                        end
 
-                            print("Worktree " .. path .. " successfully removed")
-                            utils.run_hook(M.config.hook, utils.merge_hook_path("post-delete"), data_pre_delete)
-                        end)
+                        M._post_checkout_create_worktree(branch_name, path, res_exists, hook_data, hook_path)
                     end)
+                else
+                    M._post_checkout_create_worktree(branch_name, path, res_exists, hook_data, hook_path)
                 end
-
-                print("Worktree " .. path .. " successfully removed")
-                utils.run_hook(M.config.hook, utils.merge_hook_path(hook_path, "post-delete"), data_pre_delete)
             end)
         end)
     end)

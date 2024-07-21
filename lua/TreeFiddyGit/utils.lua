@@ -1,362 +1,153 @@
-local Job = require("plenary.job")
+local logger = require("TreeFiddyGit.logger")
 local path_utils = require("plenary.path")
 
 local M = {}
 
-M.BranchLocation = {
-    NONE = "none",
-    LOCAL = "local",
-    REMOTE = "remote",
-}
-
-M.make_relative = function(path, base)
+function M.make_relative(path, base)
     return path_utils.new(path):make_relative(base)
 end
 
---- This function returns a reference to the current git worktree.
--- The returned reference is in the format `path/to/gitrepo.git/worktrees/worktree_name`,
--- where `worktree_name` is the name of the current worktree.
--- The format is always gitrepo.git/worktrees/worktree_name, even if the worktree
--- is deeply nested in other worktrees.
--- @param callback function: The callback function to be called with the result.
-M._get_git_worktree_reference = function(callback)
-    Job:new({
-        command = "git",
-        args = { "rev-parse", "--git-dir" },
-        on_exit = function(j, return_val)
-            if return_val == 0 then
-                local result = j:result()[1]
-                callback(result:match("^%s*(.-)%s*$"), nil)
-            else
-                callback(nil, "Failed to run `git rev-parse --git-dir`")
-            end
-        end,
-    }):start()
-end
+function M._is_absolute_path(path)
+    logger.log(logger.LogLevel.DEBUG, "utils._is_absolute_path", "called with: " .. vim.inspect(path))
 
---- This function returns the current working directory.
--- @param callback function: The callback function to be called with the result.
-M._get_pwd = function(callback)
-    Job:new({
-        command = "pwd",
-        on_exit = function(j, return_val)
-            if return_val == 0 then
-                local result = j:result()[1]
-                callback(result:match("^%s*(.-)%s*$"), nil)
-            else
-                callback(nil, "Failed to run pwd")
-            end
-        end,
-    }):start()
-end
-
-M._git_branch_exists_locally = function(branch, callback)
-    Job:new({
-        command = "git",
-        args = { "branch", "--list", "-a", branch },
-        on_exit = function(j, return_val)
-            if return_val == 0 then
-                if j:result()[1] == nil then
-                    callback(false, nil)
-                else
-                    callback(true, nil)
-                end
-            else
-                callback(nil, "Failed to run git branch --list -a " .. branch)
-            end
-        end,
-    }):start()
-end
-
-M._git_branch_exists_remote = function(branch, callback)
-    Job:new({
-        command = "bash",
-        args = { "-c", "git ls-remote --heads origin " .. branch },
-        on_exit = function(j, return_val)
-            if return_val == 0 then
-                if j:result()[1] ~= nil then
-                    -- The branch exists on remote
-                    callback(true, nil)
-                else
-                    -- The branch does not exist on remote
-                    callback(false, nil)
-                end
-            else
-                callback(nil, "Failed to call `git ls-remote --heads origin " .. branch)
-            end
-        end,
-    }):start()
-end
-
-M._branch_has_changes = function(callback)
-    Job:new({
-        command = "git",
-        args = { "diff", "--quiet" },
-        on_exit = function(_, return_val)
-            if return_val == 0 then
-                callback(false)
-            else
-                callback(true)
-            end
-        end,
-    }):start()
-end
-
-M.stash = function(callback)
-    M._branch_has_changes(function(has_changes)
-        if not has_changes then
-            callback(false, nil)
-            return
-        end
-
-        Job:new({
-            command = "git",
-            args = { "stash" },
-            on_exit = function(_, return_val)
-                if return_val == 0 then
-                    callback(true, nil)
-                else
-                    callback(nil, "Failed to run `git stash`")
-                end
-            end,
-        }):start()
-    end)
-end
-
-M.stash_pop = function(callback)
-    Job:new({
-        command = "git",
-        args = { "stash", "pop" },
-        on_exit = function(_, return_val)
-            if return_val == 0 then
-                if callback ~= nil then
-                    callback(nil, nil)
-                end
-            else
-                if callback ~= nil then
-                    callback(nil, "Failed to pop stash")
-                end
-            end
-        end,
-    }):start()
-end
-
-M.create_git_branch = function(branch_name, callback)
-    Job:new({
-        command = "git",
-        args = { "branch", branch_name },
-        on_exit = function(_, return_val)
-            if return_val == 0 then
-                callback(nil, nil)
-            else
-                callback(nil, "Failed to call `git branch " .. branch_name .. "`")
-            end
-        end,
-    }):start()
-end
-
-M.git_branch_exists = function(branch, callback)
-    M._git_branch_exists_locally(branch, function(exists_locally, err_local)
-        if err_local ~= nil then
-            callback(nil, err_local)
-            return
-        end
-
-        if exists_locally then
-            callback(M.BranchLocation.LOCAL, nil)
-        else
-            print(branch .. " not found locally. Checking remote...")
-            M._git_branch_exists_remote(branch, function(exists_remote, err_remote)
-                if err_remote ~= nil then
-                    callback(nil, err_remote)
-                    return
-                end
-
-                if exists_remote then
-                    callback(M.BranchLocation.REMOTE, nil)
-                else
-                    callback(M.BranchLocation.NONE, nil)
-                end
-            end)
-        end
-    end)
-end
-
-M.current_branch_and_path = function(callback)
-    Job:new({
-        command = "git",
-        args = { "branch", "--show-current" },
-        on_exit = function(j, return_val)
-            if return_val == 0 then
-                local result = j:result()[1]
-                local current_branch = result:match("^%s*(.-)%s*$")
-                M._get_pwd(function(current_path, err_pwd)
-                    if err_pwd ~= nil then
-                        callback(nil, err_pwd)
-                        return
-                    end
-
-                    callback({ current_branch, current_path }, nil)
-                end)
-            else
-                callback(nil, "Failed to run `git branch --show-current`")
-            end
-        end
-    }):start()
-end
-
---- This function returns the actual path of the current git worktree.
--- The returned path is the root path of the current worktree, regardless of
--- how deeply nested the current directory is within the worktree.
--- @param callback function: The callback function to be called with the result.
-M.get_git_path = function(callback)
-    Job:new({
-        command = "git",
-        args = { "rev-parse", "--show-toplevel" },
-        on_exit = function(j, return_val)
-            if return_val == 0 then
-                local result = j:result()[1]
-                callback(result:match("^%s*(.-)%s*$"), nil)
-            else
-                callback(nil, nil)
-            end
-        end,
-    }):start()
-end
-
-M.delete_worktree = function(path, callback)
-    Job:new({
-        command = "git",
-        args = { "worktree", "remove", path },
-        on_exit = function(j, return_val)
-            if return_val == 0 then
-                callback(nil, nil)
-            else
-                callback(nil, "Failed to run git worktree remove")
-            end
-        end
-    }):start()
-end
-
-M.force_delete_worktree = function(path, callback)
-    Job:new({
-        command = "git",
-        args = { "worktree", "remove", path, "--force" },
-        on_exit = function(j, return_val)
-            if return_val == 0 then
-                callback(nil, nil)
-            else
-                callback(nil, "Failed to run `git worktree remove " .. path .. " --force`")
-            end
-        end
-    }):start()
-end
-
---- This function returns the root path of the current git repository.
--- No matter where the command is run from, it will always get the root path of the git repository.
--- If a tree is nested in another tree, it won't affect the result.
--- If a user is in some deeply nested directory, it will still only return the root path
--- If the current directory is not a supported (bare) git repository, it throws an error.
--- @param callback function: The callback function to be called with the result.
-M.get_git_root_path = function(callback)
-    M._get_git_worktree_reference(function(root_path)
-        if root_path == nil then
-            callback(nil, "Not in a git repository")
-            return
-        end
-
-        if root_path == "." then
-            M._get_pwd(function(pwd, pwd_err)
-                if pwd == nil then
-                    callback(nil, pwd_err)
-                end
-
-                if pwd:sub(-4) == ".git" then
-                    callback(pwd, nil)
-                else
-                    callback(nil, "Not in a git repository")
-                end
-            end)
-        elseif root_path == ".git" then
-            callback(nil, "Not in a supported git repository. Must be bare")
-        elseif root_path:find(".git/worktrees/") then
-            -- remove the current branch from the path
-            root_path = root_path:match("^(.+.git)/worktrees.*")
-            callback(root_path, nil)
-        else
-            callback(nil, "Failed to get git root path")
-        end
-    end)
-end
-
-M.update_worktree_buffer_path = function(old_git_path, new_git_path, buf_path)
-    if old_git_path == nil then
-        return nil
+    if path:sub(1, 1) == "/" then
+        logger.log(logger.LogLevel.INFO, "utils._is_absolute_path", "starts with '/', so true")
+        return true
     end
 
+    -- Windows
+    local windows_root = path:match("^%a:[/\\]")
+
+    if windows_root == nil then
+        logger.log(logger.LogLevel.INFO, "utils._is_absolute_path", "does not start with windows root, so false")
+        return false
+    else
+        logger.log(logger.LogLevel.INFO, "utils._is_absolute_path", "starts with windows root, so true")
+        return true
+    end
+end
+
+function M._make_absolute(root, path)
+    local self_name = "utils.make_absolute"
+    logger.log(logger.LogLevel.DEBUG, self_name, "called with: " .. vim.inspect({ root, path }))
+
+    if M._is_absolute_path(path) then
+        logger.log(logger.LogLevel.INFO, self_name, "Given `path` is already absolute")
+        return path
+    end
+
+    if not M._is_absolute_path(root) then
+        logger.log(logger.LogLevel.WARN, "utils.make_absolute", "Given `root` is not absolute")
+    end
+
+    local separator = "/"
+    if root:match("^%a:\\") then
+        logger.log(logger.LogLevel.DEBUG, self_name, "Windows root detected")
+        separator = "\\"
+    end
+
+    if root:sub(-1) == "/" or root:sub(-1) == "\\" then
+        logger.log(logger.LogLevel.DEBUG, self_name, "Removing trailing separator from root")
+        root = root:sub(1, -2)
+    end
+
+    if path:sub(1, 2) == "./" or path:sub(1, 2) == ".\\" then
+        logger.log(logger.LogLevel.DEBUG, self_name, "Removing './' from path")
+        path = path:sub(3)
+    end
+
+    local abs_path = root .. separator .. path
+    logger.log(logger.LogLevel.DEBUG, self_name, "resulting abs_path: " .. abs_path)
+
+    if separator == "/" then
+        abs_path = abs_path:gsub("[^/\\]+", function(part)
+            logger.log(logger.LogLevel.DEBUG, self_name, "Replacing '\\' with '\\\\'")
+            return part:gsub("\\", "\\\\")
+        end)
+    end
+
+    logger.log(logger.LogLevel.INFO, self_name, "Returning: " .. abs_path)
+    return abs_path
+end
+
+function M.get_absolute_wt_path(rel_path, callback)
+    logger.log(logger.LogLevel.DEBUG, "utils.get_absolute_wt_path", "called with: " .. vim.inspect(rel_path))
+
+    require("TreeFiddyGit.jobs").get_git_root_path(function(git_root, err_git_root)
+        if err_git_root ~= nil then
+            callback(nil, err_git_root)
+            return
+        end
+
+        local abs_path = M._make_absolute(git_root, rel_path)
+        logger.log(logger.LogLevel.INFO, "utils.get_absolute_wt_path", "Returning: " .. abs_path)
+
+        callback(abs_path, nil)
+    end)
+end
+
+function M.deep_merge(base_table, new_table)
+    for k, v in pairs(new_table) do
+        if type(v) == "table" and type(base_table[k]) == "table" then
+            M.deep_merge(base_table[k], v)
+        else
+            base_table[k] = v
+        end
+    end
+    return base_table
+end
+
+function M.merge_hook_path(path, hook)
+    return path and (path .. "." .. hook) or hook
+end
+
+function M.run_hook(action, data)
+    logger.log(logger.LogLevel.DEBUG, "utils.run_hook", "called with: " .. vim.inspect({ action, data }))
+
+    local hook = require("TreeFiddyGit").config.hook
+
+    if hook == nil then
+        logger.log(logger.LogLevel.DEBUG, "utils.run_hook", "No hook defined")
+        return
+    end
+
+    if type(hook) == "string" then
+        logger.log(logger.LogLevel.INFO, "utils.run_hook", "Hook is a string, so running as a command")
+        os.execute(hook)
+    elseif type(hook) == "function" then
+        logger.log(
+            logger.LogLevel.INFO,
+            "utils.run_hook",
+            "Hook is a function, so running it with path '" .. vim.inspect(hook_path) .. "'"
+        )
+        hook(action, data)
+    end
+end
+
+function M.update_worktree_buffer_path(old_git_path, new_git_path, buf_path)
+    logger.log(
+        logger.LogLevel.DEBUG,
+        "utils.update_worktree_buffer_path",
+        "called with: " .. vim.inspect({ old_git_path, new_git_path, buf_path })
+    )
+
     if buf_path:sub(1, #old_git_path) ~= old_git_path then
-        return nil
+        logger.log(
+            logger.LogLevel.ERROR,
+            "utils.update_worktree_buffer_path",
+            "Buffer path does not start with old git path"
+        )
+        return buf_path
     end
 
     local buf_relative_path = buf_path:sub(#old_git_path + 1)
+    logger.log(
+        logger.LogLevel.INFO,
+        "utils.update_worktree_buffer_path",
+        "Returning: " .. new_git_path .. buf_relative_path
+    )
 
     return new_git_path .. buf_relative_path
-end
-
-M.fetch_remote_branch = function(branch_name, callback)
-    Job:new({
-        command = "git",
-        args = { "fetch", "origin", branch_name .. ":" .. branch_name },
-        on_exit = function(_, return_val)
-            if return_val == 0 then
-                callback(nil, nil)
-            else
-                callback(nil, "Failed to run `git fetch origin " .. branch_name .. ":" .. branch_name .. "`")
-            end
-        end,
-    }):start()
-end
-
-M.get_absolute_wt_path = function(path, callback)
-    if string.sub(path, 1, 2) == "./" then
-        path = string.sub(path, 3)
-    end
-
-    M.get_git_root_path(function(root_path, err)
-        if err ~= nil then
-            vim.schedule(function()
-                vim.api.nvim_err_writeln(err)
-            end)
-            callback(nil, err)
-        end
-
-        if string.sub(path, 1, #root_path) ~= root_path then
-            path = root_path .. "/" .. path
-        end
-
-        callback(path, nil)
-    end)
-end
-
-M.run_hook = function(hook, action, data)
-    if hook ~= nil then
-        if type(hook) == "string" then
-            os.execute(hook)
-        elseif type(hook) == "function" then
-            hook(action, data)
-        end
-    end
-end
-
-M.merge_tables = function (t1, t2)
-    for k, v in pairs(t2) do
-        t1[k] = v
-    end
-    return t1
-end
-
-M.merge_hook_path = function(path, hook)
-    return path and (path .. "." .. hook) or hook
 end
 
 return M
