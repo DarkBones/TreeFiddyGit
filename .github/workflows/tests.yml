@@ -26,10 +26,14 @@ jobs:
           sudo mv squashfs-root /opt/nvim
           sudo ln -s /opt/nvim/AppRun /usr/bin/nvim
 
-      - name: Install luarocks locally
+      - name: Install Lua and Luarocks
         run: |
           sudo apt-get update
-          sudo apt-get install -y luarocks lua5.1
+          sudo apt-get install -y lua5.1 luarocks
+
+      - name: Configure Luarocks and Install Dependencies
+        run: |
+          luarocks --local config --local tree
           luarocks --local install plenary
           luarocks --local install busted
 
