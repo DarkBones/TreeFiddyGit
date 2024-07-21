@@ -409,4 +409,20 @@ function M.git_branch_exists(branch, callback)
     end)
 end
 
+function M.fetch_remote_branch(branch_name, callback)
+    M._run_job(
+        "git",
+        { "fetch", require("TreeFiddyGit").config.remote_name, branch_name .. ":" .. branch_name },
+        function(_, err)
+            if err then
+                logger.log(logger.LogLevel.ERROR, "jobs.fetch_remote_branch", err)
+                callback(nil, err)
+                return
+            end
+
+            callback(true, nil)
+        end
+    )
+end
+
 return M

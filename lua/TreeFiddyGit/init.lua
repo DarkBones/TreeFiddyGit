@@ -359,6 +359,22 @@ function M.create_new_worktree_with_stash(branch_name, path)
     end)
 end
 
+function M._post_checkout_create_worktree(branch_name, path)
+    M.create_worktree(branch_name, path, function(_, err_create)
+        if err_create then
+            M._handle_errors(err_create)
+            return
+        end
+
+        M.move_to_worktree(branch_name, path, function(_, err_move)
+            if err_move then
+                M._handle_errors(err_move)
+                return
+            end
+        end)
+    end)
+end
+
 function M.checkout_branch()
     local branch_name = vim.fn.input("Enter the branch name: ")
 
@@ -384,7 +400,41 @@ function M.checkout_branch()
         }
         utils.run_hook("pre_checkout_branch", hook_data)
 
-        jobs.git_branch_exists(branch_name, function() end)
+        jobs.git_branch_exists(branch_name, function(res_exists, err_exists)
+            if err_exists then
+                M._handle_errors(err_exists)
+                return
+            end
+
+            if res_exists == "none" then
+                M._handle_errors("Branch does not exist: " .. branch_name)
+                return
+            end
+
+            vim.schedule(function()
+                local path = vim.fn.input("Enter path to worktree (defaults to branch name): ")
+                if path == "" then
+                    path = branch_name
+                end
+
+                hook_data = utils.deep_merge(hook_data, { path = path, branch_location = res_exists })
+
+                if res_exists == "remote" then
+                    jobs.fetch_remote_branch(branch_name, function(_, fetch_err)
+                        if fetch_err then
+                            if not string.find(fetch_err, "%[new branch%]") then
+                                M._handle_errors(fetch_err)
+                                return
+                            end
+                        end
+
+                        M._post_checkout_create_worktree(branch_name, path)
+                    end)
+                else
+                    M._post_checkout_create_worktree(branch_name, path)
+                end
+            end)
+        end)
     end)
 end
 
