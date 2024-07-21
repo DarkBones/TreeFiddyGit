@@ -20,6 +20,7 @@ jobs:
 
       - name: Install Neovim
         run: |
+          sudo add-apt-repository ppa:neovim-ppa/stable
           sudo apt-get update
           sudo apt-get install -y neovim
 
@@ -30,13 +31,15 @@ jobs:
       - name: Check Lua Version
         run: lua -v
 
-      - name: Check Neovim Version
-        run: nvim --version
+      - name: Check Neovim Version and Path
+        run: |
+          which nvim
+          nvim --version
 
       - name: Run tests
         env:
-          PATH: $HOME/.luarocks/bin:$PATH
+          PATH: /usr/bin:$HOME/.luarocks/bin:$PATH
           LUA_PATH: "$HOME/.luarocks/share/lua/5.1/?.lua;$HOME/.luarocks/share/lua/5.1/?/init.lua;$HOME/.local/share/nvim/site/pack/vendor/start/plenary.nvim/?.lua;;"
           LUA_CPATH: "$HOME/.luarocks/lib/lua/5.1/?.so;;"
         run: |
-          ./run_tests.sh
+          bash ./run_tests.sh
