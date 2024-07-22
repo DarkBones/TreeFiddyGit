@@ -149,7 +149,7 @@ function M.move_to_worktree(branch_name, path, callback, hook_path)
                 path = path,
                 current_branch = current_branch,
                 current_path = current_path,
-                abs_worktree_path = abs_path,
+                abs_path = abs_path,
             }
             utils.run_hook(utils.merge_hook_path(hook_path, "pre-move"), hook_data)
 
@@ -191,11 +191,11 @@ function M.delete_worktree(branch_name, path, hook_path)
                 path = path,
                 current_branch = current_branch,
                 current_path = current_path,
-                abs_worktree_path = abs_path,
+                abs_path = abs_path,
             }
             utils.run_hook(utils.merge_hook_path(hook_path, "pre-delete"), hook_data)
 
-            jobs.delete_worktree(path, function(delete_result, delete_err)
+            jobs.delete_worktree(abs_path, function(delete_result, delete_err)
                 if delete_err then
                     M._handle_errors(delete_err)
                     return
@@ -260,7 +260,7 @@ function M.create_worktree(branch_name, path, callback, hook_path)
                 path = path,
                 current_branch = current_branch,
                 current_path = current_path,
-                abs_worktree_path = wt_path,
+                abs_path = wt_path,
             }
             utils.run_hook(utils.merge_hook_path(hook_path, "pre-create"), hook_data)
 

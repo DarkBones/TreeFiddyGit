@@ -191,7 +191,7 @@ function M.delete_worktree(worktree_path, callback)
     M._run_job("git", { "worktree", "remove", worktree_path }, function(_, err)
         if err ~= nil then
             if not err:find("--force") then
-                logger.log(logger.Log.ERROR, "jobs.delete_worktree", err)
+                logger.log(logger.LogLevel.ERROR, "jobs.delete_worktree", err)
                 callback(nil, err)
                 return
             end
