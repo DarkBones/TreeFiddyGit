@@ -118,20 +118,20 @@ TreeFiddyGit provides a robust hooks system that allows you to execute custom fu
 - **`data`**: Additional data related to the action (details vary by action).
 
 The available action values are:
-| Action Value                     | Description                                               |
-|----------------------------------|-----------------------------------------------------------|
-| `pre-checkout`                   | Before checking out a branch                              |
-| `post-checkout`                  | After checking out a branch                               |
-| `pre-create`                     | Before creating a new worktree                            |
-| `post-create`                    | After creating a new worktree                             |
-| `pre-move`                       | Before moving to an existing worktree                     |
-| `post-move`                      | After moving to an existing worktree                      |
-| `pre-delete`                     | Before deleting a worktree                                |
-| `post-delete`                    | After deleting a worktree                                 |
-| `create.pre-move`                | Before moving to the new worktree right after creating it |
-| `create.post-move`               | After moving to the new worktree right after creating it  |
-| `checkout.create.pre-move`       | Before moving to the new worktree right after checking out a branch |
-| `checkout.create.post-move`      | After moving to the new worktree right after checking out a branch  |
+| Action Value         | Description                                                         |
+|----------------------|---------------------------------------------------------------------|
+| `pre-checkout`       | Before checking out a branch                                        |
+| `post-checkout`      | After checking out a branch                                         |
+| `pre-create`         | Before creating a new worktree                                      |
+| `post-create`        | After creating a new worktree                                       |
+| `pre-move`           | Before moving to an existing worktree                               |
+| `post-move`          | After moving to an existing worktree                                |
+| `pre-delete`         | Before deleting a worktree                                          |
+| `post-delete`        | After deleting a worktree                                           |
+| `create.pre-move`    | Before moving to the new worktree right after creating it           |
+| `create.post-move`   | After moving to the new worktree right after creating it            |
+| `checkout.pre-move`  | Before moving to the new worktree right after checking out a branch |
+| `checkout.post-move` | After moving to the new worktree right after checking out a branch  |
 
 #### Example Hook
 Here's an example of how you can set up a hook in the plugin configuration:
