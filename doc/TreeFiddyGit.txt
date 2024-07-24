@@ -186,10 +186,10 @@ The available action values are:
 - `create.post-move` 
   After moving to the new worktree right after creating it.
 
-- `checkout.create.pre-move` 
+- `checkout.pre-move` 
   Before moving to the new worktree right after checking out a branch.
 
-- `checkout.create.post-move` 
+- `checkout.post-move` 
   After moving to the new worktree right after checking out a branch.
 
 ### Example Hook
