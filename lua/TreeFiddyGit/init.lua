@@ -151,6 +151,8 @@ function M.move_to_worktree(branch_name, path, callback, hook_path)
                 current_path = current_path,
                 abs_path = abs_path,
             }
+
+            -- TODO: Store branch moved to in vim.fn.stdpath('data')
             utils.run_hook(utils.merge_hook_path(hook_path, "pre-move"), hook_data)
 
             M._perform_move(abs_path, hook_data, function()

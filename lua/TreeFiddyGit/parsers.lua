@@ -66,7 +66,7 @@ function M.parse_branch_name(branch_name)
     branch_name = branch_name:match("^%s*(.-)%s*$")
 
     -- Replace invalid characters with hyphens
-    branch_name = branch_name:gsub("[^%w%-_/.]", "-")
+    branch_name = branch_name:gsub("[^%w%-_.]", "-")
 
     return branch_name
 end
