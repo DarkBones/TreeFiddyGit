@@ -106,6 +106,13 @@ describe("parsers", function()
             assert.are.equal(expected, result)
         end)
 
+        it("does not replace underscores with hyphens", function()
+            local branch_name = "feature_new_feature_1"
+            local expected = "feature_new_feature_1"
+            local result = parsers.parse_branch_name(branch_name)
+            assert.are.equal(expected, result)
+        end)
+
         it("replaces spaces with hyphens and remove trailing and leading spaces", function()
             local branch_name = " feature new feature 1    "
             local expected = "feature-new-feature-1"
@@ -153,6 +160,13 @@ describe("parsers", function()
         it("replaces spaces with hyphens", function()
             local path = "/home/user/my project with spaces"
             local expected = "home/user/my-project-with-spaces"
+            local result = parsers.parse_path(path)
+            assert.are.equal(expected, result)
+        end)
+
+        it("does not replace underscores with hyphens", function()
+            local path = "/home/user/my_project_with_underscores"
+            local expected = "home/user/my_project_with_underscores"
             local result = parsers.parse_path(path)
             assert.are.equal(expected, result)
         end)
