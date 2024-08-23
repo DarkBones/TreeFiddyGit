@@ -79,7 +79,7 @@ function M.parse_path(path)
     path = path:gsub("\\", "/")
 
     -- Replace non-alphanumeric characters (except for '/') with hyphens
-    path = path:gsub("[^%w/]", "-")
+    path = path:gsub("[^%w/_]", "-")
 
     -- Replace spaces with hyphens
     path = path:gsub("%s+", "-")
